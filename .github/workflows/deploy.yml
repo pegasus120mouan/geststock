@@ -1,0 +1,54 @@
+name: Deploy Laravel to VPS
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.APP_DIR }}"
+
+            echo "🚀 Déploiement en cours..."
+
+            git config --global --add safe.directory "${{ secrets.APP_DIR }}"
+
+            echo "📥 Récupération du code..."
+            git fetch --all
+            git reset --hard origin/main
+
+            echo "📦 Installation des dépendances..."
+            composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+            echo "🧹 Nettoyage du cache..."
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan view:clear
+            php artisan route:clear
+
+            echo "🗄️ Migration de la base de données..."
+            php artisan migrate --force
+
+            echo "🔧 Optimisation du cache..."
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            echo "🔑 Permissions..."
+            sudo chown -R www-data:www-data storage bootstrap/cache
+            sudo chmod -R 775 storage bootstrap/cache
+
+            echo "🔄 Redémarrage des services..."
+            sudo systemctl reload php8.2-fpm || sudo systemctl reload php-fpm || true
+
+            echo "✅ Déploiement terminé avec succès!"
