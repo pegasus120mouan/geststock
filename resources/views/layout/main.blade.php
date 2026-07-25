@@ -289,8 +289,32 @@
             </a>
           </div>
 
-          <div class="navbar-nav-right d-flex align-items-center justify-content-end w-100" id="navbar-collapse">
+          <div class="navbar-nav-right d-flex align-items-center w-100" id="navbar-collapse">
+            <div class="navbar-nav align-items-center flex-grow-1">
+              <div class="nav-item d-flex align-items-center w-100 w-md-auto" style="max-width: 360px;">
+                <i class="bx bx-search bx-md"></i>
+                <input
+                  type="text"
+                  class="form-control border-0 shadow-none bg-transparent ps-2"
+                  placeholder="Search..."
+                  aria-label="Search..." />
+              </div>
+            </div>
             <ul class="navbar-nav flex-row align-items-center ms-auto">
+              @php
+                $nbRupturesNav = \App\Models\Produit::query()
+                  ->where('statut', 'actif')
+                  ->where('stock_ml', '<=', 0)
+                  ->count();
+              @endphp
+              <li class="nav-item me-3">
+                <a href="{{ route('produits.index') }}" class="btn btn-sm btn-outline-secondary position-relative">
+                  En attente
+                  <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                    {{ $nbRupturesNav }}
+                  </span>
+                </a>
+              </li>
               <li class="nav-item navbar-dropdown dropdown-user dropdown">
                 <a class="nav-link dropdown-toggle hide-arrow p-0" href="javascript:void(0);" data-bs-toggle="dropdown">
                   <div class="avatar avatar-online">
