@@ -5,6 +5,7 @@ use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FlaconController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\PrixUnitaireController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\UtilisateurController;
@@ -29,6 +30,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/commandes', [CommandeController::class, 'store'])->name('commandes.store');
     Route::patch('/commandes/{commande}/statut', [CommandeController::class, 'updateStatut'])->name('commandes.statut');
 
+    Route::get('/prix-unitaires', [PrixUnitaireController::class, 'index'])->name('prix-unitaires.index');
+    Route::post('/prix-unitaires', [PrixUnitaireController::class, 'store'])->name('prix-unitaires.store');
+    Route::put('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'update'])->name('prix-unitaires.update');
+    Route::delete('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'destroy'])->name('prix-unitaires.destroy');
+
     Route::resource('utilisateurs', UtilisateurController::class)->except(['show']);
 });
+
 

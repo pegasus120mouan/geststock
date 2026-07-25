@@ -3,6 +3,10 @@
 @section('title', 'Commandes')
 
 @section('content')
+@php
+  $fmt = fn ($n) => number_format((float) $n, 0, ',', ' ');
+@endphp
+
 <div class="content-wrapper">
   <div class="container-xxl flex-grow-1 container-p-y">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -67,6 +71,8 @@
               <th>Parfum</th>
               <th>Contenance</th>
               <th>Qté</th>
+              <th>Prix unitaire</th>
+              <th>Montant</th>
               <th>Client</th>
               <th>Téléphone</th>
               <th>Statut</th>
@@ -80,6 +86,8 @@
                 <td>{{ $commande->produit?->nom ?? '—' }}</td>
                 <td>{{ $commande->flacon ? $commande->flacon->contenance_ml.' ml' : '—' }}</td>
                 <td>{{ $commande->quantite }}</td>
+                <td>{{ $fmt($commande->prix_unitaire) }} FCFA</td>
+                <td class="fw-semibold text-primary">{{ $fmt($commande->montant()) }} FCFA</td>
                 <td>{{ $commande->client_nom ?: '—' }}</td>
                 <td>{{ $commande->client_telephone }}</td>
                 <td style="min-width: 160px;">
@@ -102,7 +110,7 @@
               </tr>
             @empty
               <tr>
-                <td colspan="8" class="text-center py-5 text-muted">
+                <td colspan="10" class="text-center py-5 text-muted">
                   Aucune commande enregistrée pour le moment.
                 </td>
               </tr>

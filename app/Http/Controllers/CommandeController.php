@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\VolumeUnit;
 use App\Models\Commande;
 use App\Models\Flacon;
+use App\Models\PrixUnitaire;
 use App\Models\Produit;
 use App\Models\StockMouvement;
 use Illuminate\Http\Request;
@@ -59,11 +60,29 @@ class CommandeController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $tarif = PrixUnitaire::query()
+            ->where('produit_id', $validated['produit_id'])
+            ->where('flacon_id', $validated['flacon_id'])
+            ->first();
+
+        if (! $tarif) {
+            return redirect()
+                ->route('commandes.index', ['create' => 1])
+                ->withInput()
+                ->withErrors([
+                    'produit_id' => 'Aucun prix unitaire défini pour ce parfum et cette contenance. Renseignez-le d’abord dans Prix Unitaire.',
+                ]);
+        }
+
+        $prixUnitaire = (float) $tarif->prix;
+        $montant = round($prixUnitaire * (int) $validated['quantite'], 2);
+
         try {
-            DB::transaction(function () use ($validated) {
+            DB::transaction(function () use ($validated, $prixUnitaire, $montant) {
                 $commande = Commande::query()->create([
                     ...$validated,
-                    'total' => 0,
+                    'prix_unitaire' => $prixUnitaire,
+                    'total' => $montant,
                     'date_commande' => now()->toDateString(),
                     'reference' => $this->generateReference(),
                     'user_id' => Auth::id(),

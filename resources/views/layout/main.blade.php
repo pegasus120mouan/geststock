@@ -277,6 +277,20 @@
               </ul>
             </li>
 
+            <li class="menu-item {{ request()->routeIs('prix-unitaires.*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons bx bx-purchase-tag"></i>
+                <div class="text-truncate">Prix Unitaire</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->routeIs('prix-unitaires.index') ? 'active' : '' }}">
+                  <a href="{{ route('prix-unitaires.index') }}" class="menu-link">
+                    <div class="text-truncate">Liste des prix</div>
+                  </a>
+                </li>
+              </ul>
+            </li>
+
           @if(auth()->user()?->role === 'admin')
             <li class="menu-header">Administration</li>
             <li class="menu-item {{ request()->routeIs('utilisateurs.*') ? 'active open' : '' }}">
