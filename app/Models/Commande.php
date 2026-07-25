@@ -35,13 +35,50 @@ class Commande extends Model
         ];
     }
 
+    public function prixEffectif(): float
+    {
+        if ((float) $this->prix_unitaire > 0) {
+            return (float) $this->prix_unitaire;
+        }
+
+        $tarif = PrixUnitaire::query()
+            ->where('produit_id', $this->produit_id)
+            ->where('flacon_id', $this->flacon_id)
+            ->value('prix');
+
+        return (float) ($tarif ?? 0);
+    }
+
     public function montant(): float
     {
         if ((float) $this->total > 0) {
             return (float) $this->total;
         }
 
-        return round((float) $this->prix_unitaire * (int) $this->quantite, 2);
+        return round($this->prixEffectif() * (int) $this->quantite, 2);
+    }
+
+    /**
+     * Remplit prix_unitaire/total depuis le tarif si la commande a encore 0.
+     */
+    public function synchroniserPrixDepuisTarif(): bool
+    {
+        if ((float) $this->prix_unitaire > 0 && (float) $this->total > 0) {
+            return false;
+        }
+
+        $prix = $this->prixEffectif();
+
+        if ($prix <= 0) {
+            return false;
+        }
+
+        $this->forceFill([
+            'prix_unitaire' => $prix,
+            'total' => round($prix * (int) $this->quantite, 2),
+        ])->save();
+
+        return true;
     }
 
     public function user(): BelongsTo

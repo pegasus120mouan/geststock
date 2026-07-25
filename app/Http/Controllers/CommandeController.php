@@ -19,6 +19,20 @@ class CommandeController extends Controller
 {
     public function index(Request $request)
     {
+        // Corrige les anciennes commandes enregistrées à 0 alors qu'un tarif existe.
+        Commande::query()
+            ->where(function ($q) {
+                $q->where('prix_unitaire', '<=', 0)->orWhere('total', '<=', 0);
+            })
+            ->whereNotNull('produit_id')
+            ->whereNotNull('flacon_id')
+            ->orderBy('id')
+            ->chunkById(50, function ($commandes) {
+                foreach ($commandes as $commande) {
+                    $commande->synchroniserPrixDepuisTarif();
+                }
+            });
+
         $commandes = Commande::query()
             ->with(['user', 'produit', 'flacon'])
             ->when($request->filled('q'), function ($query) use ($request) {

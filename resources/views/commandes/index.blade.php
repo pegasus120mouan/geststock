@@ -86,7 +86,7 @@
                 <td>{{ $commande->produit?->nom ?? '—' }}</td>
                 <td>{{ $commande->flacon ? $commande->flacon->contenance_ml.' ml' : '—' }}</td>
                 <td>{{ $commande->quantite }}</td>
-                <td>{{ $fmt($commande->prix_unitaire) }} FCFA</td>
+                <td>{{ $fmt($commande->prixEffectif()) }} FCFA</td>
                 <td class="fw-semibold text-primary">{{ $fmt($commande->montant()) }} FCFA</td>
                 <td>{{ $commande->client_nom ?: '—' }}</td>
                 <td>{{ $commande->client_telephone }}</td>
