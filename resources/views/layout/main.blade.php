@@ -262,6 +262,21 @@
               </ul>
             </li>
 
+          <li class="menu-header">Ventes</li>
+            <li class="menu-item {{ request()->routeIs('commandes.*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons bx bx-cart"></i>
+                <div class="text-truncate">Commandes</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->routeIs('commandes.index') ? 'active' : '' }}">
+                  <a href="{{ route('commandes.index') }}" class="menu-link">
+                    <div class="text-truncate">Liste des commandes</div>
+                  </a>
+                </li>
+              </ul>
+            </li>
+
           @if(auth()->user()?->role === 'admin')
             <li class="menu-header">Administration</li>
             <li class="menu-item {{ request()->routeIs('utilisateurs.*') ? 'active open' : '' }}">

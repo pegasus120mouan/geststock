@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FlaconController;
 use App\Http\Controllers\HomeController;
@@ -24,5 +25,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/stock/entrees', [StockController::class, 'storeEntree'])->name('stock.entrees.store');
     Route::get('/stock/sorties', [StockController::class, 'sorties'])->name('stock.sorties');
 
+    Route::get('/commandes', [CommandeController::class, 'index'])->name('commandes.index');
+    Route::post('/commandes', [CommandeController::class, 'store'])->name('commandes.store');
+
     Route::resource('utilisateurs', UtilisateurController::class)->except(['show']);
 });
+
