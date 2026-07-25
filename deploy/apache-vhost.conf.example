@@ -1,0 +1,33 @@
+# Exemple VirtualHost Apache pour GestStock
+# À placer dans /etc/apache2/sites-available/geststock.conf
+# puis : sudo a2ensite geststock && sudo systemctl reload apache2
+
+<VirtualHost *:80>
+    ServerName votredomaine.com
+    ServerAlias www.votredomaine.com
+
+    # IMPORTANT : pointer vers le dossier public/ de Laravel
+    DocumentRoot /var/www/geststock/public
+
+    <Directory /var/www/geststock/public>
+        Options FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/geststock-error.log
+    CustomLog ${APACHE_LOG_DIR}/geststock-access.log combined
+</VirtualHost>
+
+# Avec HTTPS (après certificat Let's Encrypt) :
+# <VirtualHost *:443>
+#     ServerName votredomaine.com
+#     DocumentRoot /var/www/geststock/public
+#     SSLEngine on
+#     SSLCertificateFile /etc/letsencrypt/live/votredomaine.com/fullchain.pem
+#     SSLCertificateKeyFile /etc/letsencrypt/live/votredomaine.com/privkey.pem
+#     <Directory /var/www/geststock/public>
+#         AllowOverride All
+#         Require all granted
+#     </Directory>
+# </VirtualHost>
