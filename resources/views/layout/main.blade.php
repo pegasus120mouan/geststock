@@ -13,13 +13,166 @@
   <link rel="icon" type="image/x-icon" href="{{ asset('img/favicon/favicon.ico') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/iconify-icons.css') }}" />
   <link rel="stylesheet" href="{{ asset('assets/vendor/css/core.css') }}" />
   <link rel="stylesheet" href="{{ asset('assets/css/demo.css') }}" />
   <link rel="stylesheet" href="{{ asset('assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
   <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
   <script src="{{ asset('assets/js/config.js') }}"></script>
+  <style>
+    :root {
+      --gs-ink: #14110f;
+      --gs-ink-soft: #2a221e;
+      --gs-champagne: #c4a574;
+      --gs-sand: #efe6da;
+      --gs-muted: rgba(239, 230, 218, 0.62);
+      --gs-line: rgba(239, 230, 218, 0.12);
+    }
+
+    body {
+      font-family: "Outfit", sans-serif;
+      background: #f4efe8;
+    }
+
+    #layout-menu.menu-vertical {
+      background: linear-gradient(180deg, #1a1512 0%, #100e0c 100%) !important;
+      box-shadow: 8px 0 30px rgba(20, 17, 15, 0.18);
+      border-right: 1px solid var(--gs-line);
+    }
+
+    #layout-menu .app-brand {
+      min-height: 78px;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--gs-line);
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    #layout-menu .app-brand-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 0;
+      text-decoration: none;
+    }
+
+    #layout-menu .brand-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      object-fit: cover;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(196, 165, 116, 0.35);
+    }
+
+    #layout-menu .brand-copy {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      line-height: 1.15;
+    }
+
+    #layout-menu .brand-title {
+      font-family: "Cormorant Garamond", serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #f7eee3;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #layout-menu .brand-subtitle {
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gs-champagne);
+      font-weight: 500;
+      margin-top: 0.15rem;
+    }
+
+    #layout-menu .menu-inner {
+      padding: 1rem 0.75rem 1.25rem !important;
+    }
+
+    #layout-menu .menu-header {
+      margin: 0.85rem 0.5rem 0.45rem;
+      padding: 0;
+      color: rgba(196, 165, 116, 0.75);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      line-height: 1.4;
+    }
+
+    #layout-menu .menu-inner > .menu-item {
+      margin-bottom: 0.2rem;
+    }
+
+    #layout-menu .menu-link {
+      border-radius: 12px !important;
+      margin: 0 !important;
+      color: var(--gs-muted) !important;
+      font-weight: 450;
+      font-size: 0.92rem;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    }
+
+    #layout-menu .menu-icon {
+      color: rgba(196, 165, 116, 0.85) !important;
+    }
+
+    #layout-menu .menu-item:not(.active):not(.open) > .menu-link:hover {
+      background: rgba(196, 165, 116, 0.1) !important;
+      color: #fff !important;
+      transform: translateX(2px);
+    }
+
+    #layout-menu .menu-item.active > .menu-link,
+    #layout-menu .menu-item.open > .menu-link {
+      background: linear-gradient(135deg, rgba(196, 165, 116, 0.22), rgba(196, 165, 116, 0.08)) !important;
+      color: #fff !important;
+      box-shadow: inset 0 0 0 1px rgba(196, 165, 116, 0.25);
+    }
+
+    #layout-menu .menu-item.active > .menu-link .menu-icon,
+    #layout-menu .menu-item.open > .menu-link .menu-icon {
+      color: var(--gs-champagne) !important;
+    }
+
+    #layout-menu .menu-sub {
+      padding-left: 0.35rem !important;
+      margin-top: 0.15rem;
+    }
+
+    #layout-menu .menu-sub .menu-link {
+      font-size: 0.86rem;
+      padding-block: 0.55rem !important;
+      color: rgba(239, 230, 218, 0.55) !important;
+    }
+
+    #layout-menu .menu-sub .menu-item.active > .menu-link {
+      background: rgba(196, 165, 116, 0.16) !important;
+      color: #fff !important;
+    }
+
+    #layout-menu .menu-toggle::after {
+      color: rgba(196, 165, 116, 0.7) !important;
+    }
+
+    #layout-menu .app-brand .layout-menu-toggle {
+      color: var(--gs-sand) !important;
+    }
+
+    .layout-navbar {
+      background: rgba(255, 252, 247, 0.92) !important;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(20, 17, 15, 0.06);
+      box-shadow: 0 8px 24px rgba(20, 17, 15, 0.05);
+    }
+  </style>
   @stack('styles')
 </head>
 <body>
@@ -28,7 +181,11 @@
       <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
         <div class="app-brand demo">
           <a href="{{ route('dashboard') }}" class="app-brand-link">
-            <span class="app-brand-text demo menu-text fw-bold ms-2">GestStock</span>
+            <img src="{{ asset('img/logo/logo.jpeg') }}" alt="Logo" class="brand-logo" />
+            <span class="brand-copy">
+              <span class="brand-title">Gestion de stock</span>
+              <span class="brand-subtitle">Uniko Parfums</span>
+            </span>
           </a>
           <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">
             <i class="bx bx-chevron-left d-block d-xl-none align-middle"></i>
@@ -38,14 +195,15 @@
         <div class="menu-inner-shadow"></div>
 
         <ul class="menu-inner py-1">
+          <li class="menu-header">Principal</li>
           <li class="menu-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <a href="{{ route('dashboard') }}" class="menu-link">
-              <i class="menu-icon tf-icons bx bx-home-smile"></i>
+              <i class="menu-icon tf-icons bx bx-home-alt-2"></i>
               <div class="text-truncate">Tableau de bord</div>
             </a>
           </li>
 
-
+          <li class="menu-header">Catalogue</li>
           <li class="menu-item {{ request()->routeIs('produits.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-package"></i>
@@ -57,28 +215,9 @@
                     <div class="text-truncate">Liste des parfums</div>
                   </a>
                 </li>
-                <li class="menu-item {{ request()->boolean('create') ? 'active' : '' }}">
+                <li class="menu-item {{ request()->routeIs('produits.*') && request()->boolean('create') ? 'active' : '' }}">
                   <a href="{{ route('produits.index', ['create' => 1]) }}" class="menu-link">
                     <div class="text-truncate">Ajouter un parfum</div>
-                  </a>
-                </li>
-              </ul>
-            </li>
-
-            <li class="menu-item {{ request()->routeIs('stock.*') ? 'active open' : '' }}">
-              <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon tf-icons bx bx-archive"></i>
-                <div class="text-truncate">Stock</div>
-              </a>
-              <ul class="menu-sub">
-                <li class="menu-item {{ request()->routeIs('stock.entrees') ? 'active' : '' }}">
-                  <a href="{{ route('stock.entrees') }}" class="menu-link">
-                    <div class="text-truncate">Entrées de stock</div>
-                  </a>
-                </li>
-                <li class="menu-item {{ request()->routeIs('stock.sorties') ? 'active' : '' }}">
-                  <a href="{{ route('stock.sorties') }}" class="menu-link">
-                    <div class="text-truncate">Historique des sorties</div>
                   </a>
                 </li>
               </ul>
@@ -103,7 +242,28 @@
               </ul>
             </li>
 
+          <li class="menu-header">Inventaire</li>
+            <li class="menu-item {{ request()->routeIs('stock.*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons bx bx-archive"></i>
+                <div class="text-truncate">Stock</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->routeIs('stock.entrees') ? 'active' : '' }}">
+                  <a href="{{ route('stock.entrees') }}" class="menu-link">
+                    <div class="text-truncate">Entrées de stock</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('stock.sorties') ? 'active' : '' }}">
+                  <a href="{{ route('stock.sorties') }}" class="menu-link">
+                    <div class="text-truncate">Historique des sorties</div>
+                  </a>
+                </li>
+              </ul>
+            </li>
+
           @if(auth()->user()?->role === 'admin')
+            <li class="menu-header">Administration</li>
             <li class="menu-item {{ request()->routeIs('utilisateurs.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-user"></i>
@@ -118,13 +278,6 @@
               </ul>
             </li>
           @endif
-
-
-          
-          
-           
-          
-
         </ul>
       </aside>
 
