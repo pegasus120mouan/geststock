@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/commandes', [CommandeController::class, 'index'])->name('commandes.index');
     Route::post('/commandes', [CommandeController::class, 'store'])->name('commandes.store');
+    Route::patch('/commandes/{commande}/statut', [CommandeController::class, 'updateStatut'])->name('commandes.statut');
 
     Route::resource('utilisateurs', UtilisateurController::class)->except(['show']);
 });

@@ -24,9 +24,12 @@ class StockController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $produits = Produit::query()->where('statut', 'actif')->orderBy('nom')->get();
+
         return view('stock.entrees', [
             'mouvements' => $mouvements,
-            'produits' => Produit::query()->where('statut', 'actif')->orderBy('nom')->get(),
+            'produits' => $produits,
+            'stockTotalMl' => (float) $produits->sum('stock_ml'),
         ]);
     }
 

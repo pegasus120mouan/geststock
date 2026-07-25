@@ -22,6 +22,37 @@
       </div>
     @endif
 
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+          <h5 class="mb-0">Stock actuel</h5>
+          <small class="text-muted">Volume disponible par parfum</small>
+        </div>
+        <span class="badge bg-label-primary rounded-pill px-3 py-2">
+          Total : {{ number_format($stockTotalMl, 2, ',', ' ') }} ml
+        </span>
+      </div>
+      <div class="card-body">
+        @if ($produits->isEmpty())
+          <p class="mb-0 text-muted">Aucun parfum actif.</p>
+        @else
+          <div class="row g-3">
+            @foreach ($produits as $produit)
+              <div class="col-sm-6 col-lg-4 col-xl-3">
+                <div class="border rounded p-3 h-100 bg-lighter">
+                  <div class="fw-medium text-truncate mb-1" title="{{ $produit->nom }}">{{ $produit->nom }}</div>
+                  <div class="fs-5 fw-semibold text-primary">
+                    {{ number_format((float) $produit->stock_ml, 2, ',', ' ') }}
+                    <small class="fs-6 text-muted">ml</small>
+                  </div>
+                </div>
+              </div>
+            @endforeach
+          </div>
+        @endif
+      </div>
+    </div>
+
     <form method="GET" action="{{ route('stock.entrees') }}" class="card mb-4">
       <div class="card-body">
         <div class="row g-3 align-items-end">

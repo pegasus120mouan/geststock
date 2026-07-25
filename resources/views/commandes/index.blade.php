@@ -22,6 +22,13 @@
       </div>
     @endif
 
+    @if ($errors->has('statut'))
+      <div class="alert alert-danger alert-dismissible fade show">
+        {{ $errors->first('statut') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    @endif
+
     <form method="GET" action="{{ route('commandes.index') }}" class="card mb-4">
       <div class="card-body">
         <div class="row g-3 align-items-end">
@@ -63,7 +70,7 @@
               <th>Client</th>
               <th>Téléphone</th>
               <th>Statut</th>
-              <th>Date</th>
+              <th>Date commande</th>
             </tr>
           </thead>
           <tbody>
@@ -75,12 +82,23 @@
                 <td>{{ $commande->quantite }}</td>
                 <td>{{ $commande->client_nom ?: '—' }}</td>
                 <td>{{ $commande->client_telephone }}</td>
-                <td>
-                  <span class="badge {{ $commande->statutBadgeClass() }}">
-                    {{ $commande->statutLabel() }}
-                  </span>
+                <td style="min-width: 160px;">
+                  <form method="POST" action="{{ route('commandes.statut', $commande) }}" class="m-0">
+                    @csrf
+                    @method('PATCH')
+                    <select
+                      name="statut"
+                      class="form-select form-select-sm border-0 {{ $commande->statutBadgeClass() }}"
+                      onchange="this.form.submit()"
+                      title="Changer le statut">
+                      <option value="en_attente" @selected($commande->statut === 'en_attente')>En attente</option>
+                      <option value="confirmee" @selected($commande->statut === 'confirmee')>Confirmée</option>
+                      <option value="livree" @selected($commande->statut === 'livree')>Livrée</option>
+                      <option value="annulee" @selected($commande->statut === 'annulee')>Annulée</option>
+                    </select>
+                  </form>
                 </td>
-                <td>{{ $commande->created_at?->format('d/m/Y H:i') }}</td>
+                <td>{{ $commande->date_commande?->format('d/m/Y') ?? $commande->created_at?->format('d/m/Y') }}</td>
               </tr>
             @empty
               <tr>

@@ -15,6 +15,7 @@ class Commande extends Model
         'produit_id',
         'flacon_id',
         'quantite',
+        'date_commande',
         'client_nom',
         'client_telephone',
         'statut',
@@ -27,6 +28,7 @@ class Commande extends Model
     {
         return [
             'quantite' => 'integer',
+            'date_commande' => 'date',
             'total' => 'decimal:2',
         ];
     }
