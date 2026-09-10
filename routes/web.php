@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CocktailController;
 use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FlaconController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PrixUnitaireController;
@@ -19,8 +21,15 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::resource('produits', ProduitController::class)->except(['show', 'create']);
+    Route::get('/finance/bilan-mois', [FinanceController::class, 'bilanMois'])->name('finance.bilan-mois');
+    Route::get('/finance/statistiques', [FinanceController::class, 'statistiques'])->name('finance.statistiques');
+
+    Route::resource('produits', ProduitController::class)->except(['create']);
+    Route::post('/produits/{produit}/prix', [ProduitController::class, 'storePrix'])->name('produits.prix.store');
+    Route::put('/produits/{produit}/prix', [ProduitController::class, 'updatePrix'])->name('produits.prix.update');
+    Route::put('/produits/{produit}/seuil-alerte', [ProduitController::class, 'updateSeuil'])->name('produits.seuil.update');
     Route::resource('flacons', FlaconController::class)->except(['show', 'create']);
+    Route::resource('cocktails', CocktailController::class);
 
     Route::get('/stock/entrees', [StockController::class, 'entrees'])->name('stock.entrees');
     Route::post('/stock/entrees', [StockController::class, 'storeEntree'])->name('stock.entrees.store');
@@ -32,7 +41,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/prix-unitaires', [PrixUnitaireController::class, 'index'])->name('prix-unitaires.index');
     Route::post('/prix-unitaires', [PrixUnitaireController::class, 'store'])->name('prix-unitaires.store');
+    Route::get('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'show'])->name('prix-unitaires.show');
     Route::put('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'update'])->name('prix-unitaires.update');
+    Route::post('/prix-unitaires/{prixUnitaire}/produits', [PrixUnitaireController::class, 'attachProduit'])->name('prix-unitaires.produits.attach');
+    Route::delete('/prix-unitaires/{prixUnitaire}/produits/{produit}', [PrixUnitaireController::class, 'detachProduit'])->name('prix-unitaires.produits.detach');
     Route::delete('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'destroy'])->name('prix-unitaires.destroy');
 
     Route::resource('utilisateurs', UtilisateurController::class)->except(['show']);

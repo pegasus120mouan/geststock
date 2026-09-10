@@ -41,12 +41,13 @@ class Commande extends Model
             return (float) $this->prix_unitaire;
         }
 
-        $tarif = PrixUnitaire::query()
-            ->where('produit_id', $this->produit_id)
-            ->where('flacon_id', $this->flacon_id)
-            ->value('prix');
+        $tarif = PrixUnitaire::trouver(
+            (int) $this->produit_id,
+            (int) $this->flacon_id,
+            PrixUnitaire::CATEGORIE_DETAIL
+        );
 
-        return (float) ($tarif ?? 0);
+        return (float) ($tarif?->prix ?? 0);
     }
 
     public function montant(): float

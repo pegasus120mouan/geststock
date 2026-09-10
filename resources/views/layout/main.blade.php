@@ -204,6 +204,25 @@
           </li>
 
           <li class="menu-header">Catalogue</li>
+          <li class="menu-item {{ request()->routeIs('finance.*') ? 'active open' : '' }}">
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+              <i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i>
+              <div class="text-truncate">Gestion financière</div>
+            </a>
+            <ul class="menu-sub">
+              <li class="menu-item {{ request()->routeIs('finance.bilan-mois') ? 'active' : '' }}">
+                <a href="{{ route('finance.bilan-mois') }}" class="menu-link">
+                  <div class="text-truncate">Bilan du mois</div>
+                </a>
+              </li>
+              <li class="menu-item {{ request()->routeIs('finance.statistiques') ? 'active' : '' }}">
+                <a href="{{ route('finance.statistiques') }}" class="menu-link">
+                  <div class="text-truncate">Statistiques</div>
+                </a>
+              </li>
+            </ul>
+          </li>
+
           <li class="menu-item {{ request()->routeIs('produits.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-package"></i>
@@ -237,6 +256,25 @@
                 <li class="menu-item {{ request()->boolean('create') && request()->routeIs('flacons.*') ? 'active' : '' }}">
                   <a href="{{ route('flacons.index', ['create' => 1]) }}" class="menu-link">
                     <div class="text-truncate">Ajouter un flacon</div>
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <li class="menu-item {{ request()->routeIs('cocktails.*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons bx bx-drink"></i>
+                <div class="text-truncate">Cocktail</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ (request()->routeIs('cocktails.index') || request()->routeIs('cocktails.show')) && !request()->boolean('create') && !request()->filled('edit') ? 'active' : '' }}">
+                  <a href="{{ route('cocktails.index') }}" class="menu-link">
+                    <div class="text-truncate">Liste des cocktails</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ request()->boolean('create') && request()->routeIs('cocktails.*') ? 'active' : '' }}">
+                  <a href="{{ route('cocktails.index', ['create' => 1]) }}" class="menu-link">
+                    <div class="text-truncate">Nouveau cocktail</div>
                   </a>
                 </li>
               </ul>
@@ -283,7 +321,7 @@
                 <div class="text-truncate">Prix Unitaire</div>
               </a>
               <ul class="menu-sub">
-                <li class="menu-item {{ request()->routeIs('prix-unitaires.index') ? 'active' : '' }}">
+                <li class="menu-item {{ request()->routeIs('prix-unitaires.index') || request()->routeIs('prix-unitaires.show') ? 'active' : '' }}">
                   <a href="{{ route('prix-unitaires.index') }}" class="menu-link">
                     <div class="text-truncate">Liste des prix</div>
                   </a>
@@ -331,16 +369,13 @@
             </div>
             <ul class="navbar-nav flex-row align-items-center ms-auto">
               @php
-                $nbRupturesNav = \App\Models\Produit::query()
-                  ->where('statut', 'actif')
-                  ->where('stock_ml', '<=', 0)
-                  ->count();
+                $nbAlertesNav = \App\Models\Produit::query()->sousSeuilAlerte()->count();
               @endphp
               <li class="nav-item me-3">
-                <a href="{{ route('produits.index') }}" class="btn btn-sm btn-outline-secondary position-relative">
-                  En attente
+                <a href="{{ route('produits.index') }}" class="btn btn-sm btn-outline-secondary position-relative" title="Parfums sous seuil d’alerte">
+                  Alertes stock
                   <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                    {{ $nbRupturesNav }}
+                    {{ $nbAlertesNav }}
                   </span>
                 </a>
               </li>

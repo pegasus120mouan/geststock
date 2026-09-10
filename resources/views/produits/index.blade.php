@@ -64,7 +64,11 @@
                     <img src="{{ $produit->image_url }}" alt="{{ $produit->nom }}" class="rounded" style="width:40px;height:40px;object-fit:cover;" />
                   </div>
                 </td>
-                <td class="fw-medium">{{ $produit->nom }}</td>
+                <td class="fw-medium">
+                  <a href="{{ route('produits.show', $produit) }}" class="text-heading text-decoration-none">
+                    {{ $produit->nom }}
+                  </a>
+                </td>
                 <td>{{ number_format((float) $produit->stock_ml, 2, ',', ' ') }}</td>
                 <td>
                   <span class="badge {{ $produit->isActif() ? 'bg-label-success' : 'bg-label-secondary' }}">

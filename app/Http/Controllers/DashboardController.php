@@ -25,10 +25,10 @@ class DashboardController extends Controller
         $nbRuptures = $produits->where('statut', 'actif')->where('stock_ml', '<=', 0)->count();
         $nbMouvements = StockMouvement::query()->count();
 
-        $seuilFaible = 500;
+        $seuilFaible = null;
         $stockFaible = $produits
             ->where('statut', 'actif')
-            ->filter(fn (Produit $p) => $p->stock_ml > 0 && $p->stock_ml < $seuilFaible);
+            ->filter(fn (Produit $p) => $p->isSousSeuilAlerte());
 
         $mouvementsByProduit = StockMouvement::query()
             ->selectRaw("

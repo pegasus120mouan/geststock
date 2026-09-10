@@ -19,6 +19,7 @@ class Produit extends Model
         'prix_achat_ml',
         'image',
         'stock_ml',
+        'seuil_alerte_ml',
         'statut',
     ];
 
@@ -27,6 +28,7 @@ class Produit extends Model
         return [
             'prix_achat_ml' => 'decimal:4',
             'stock_ml' => 'decimal:2',
+            'seuil_alerte_ml' => 'decimal:2',
         ];
     }
 
@@ -78,6 +80,29 @@ class Produit extends Model
         return $this->statut === 'actif';
     }
 
+    public function hasSeuilAlerte(): bool
+    {
+        return $this->seuil_alerte_ml !== null && (float) $this->seuil_alerte_ml > 0;
+    }
+
+    public function isSousSeuilAlerte(): bool
+    {
+        if (! $this->hasSeuilAlerte()) {
+            return false;
+        }
+
+        return (float) $this->stock_ml <= (float) $this->seuil_alerte_ml;
+    }
+
+    public function scopeSousSeuilAlerte($query)
+    {
+        return $query
+            ->where('statut', 'actif')
+            ->whereNotNull('seuil_alerte_ml')
+            ->where('seuil_alerte_ml', '>', 0)
+            ->whereColumn('stock_ml', '<=', 'seuil_alerte_ml');
+    }
+
     public function getImageUrlAttribute(): string
     {
         $image = is_string($this->image) ? trim($this->image) : '';
@@ -101,5 +126,11 @@ class Produit extends Model
     public function stockMouvements()
     {
         return $this->hasMany(StockMouvement::class);
+    }
+
+    public function prixUnitaires()
+    {
+        return $this->belongsToMany(PrixUnitaire::class, 'produit_prix_unitaire')
+            ->withTimestamps();
     }
 }

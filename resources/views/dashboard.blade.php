@@ -213,7 +213,7 @@
                     </span>
                     <h5 class="mb-0">Stock faible</h5>
                   </div>
-                  <span class="badge bg-warning rounded-pill">Sous {{ $seuilFaible }} ml</span>
+                  <span class="badge bg-warning rounded-pill">Seuil d’alerte atteint</span>
                 </div>
 
                 <div class="d-flex align-items-end justify-content-between">
@@ -238,7 +238,9 @@
                     @foreach ($stockFaible->take(4) as $produit)
                       <li class="d-flex justify-content-between align-items-center py-1">
                         <span class="text-truncate me-2">{{ $produit->nom }}</span>
-                        <span class="badge bg-label-warning">{{ $fmt($produit->stock_ml) }} ml</span>
+                        <span class="badge bg-label-warning">
+                          {{ $fmt($produit->stock_ml) }} / {{ $fmt($produit->seuil_alerte_ml) }} ml
+                        </span>
                       </li>
                     @endforeach
                   </ul>

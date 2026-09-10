@@ -74,17 +74,18 @@ class CommandeController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $tarif = PrixUnitaire::query()
-            ->where('produit_id', $validated['produit_id'])
-            ->where('flacon_id', $validated['flacon_id'])
-            ->first();
+        $tarif = PrixUnitaire::trouver(
+            (int) $validated['produit_id'],
+            (int) $validated['flacon_id'],
+            PrixUnitaire::CATEGORIE_DETAIL
+        );
 
         if (! $tarif) {
             return redirect()
                 ->route('commandes.index', ['create' => 1])
                 ->withInput()
                 ->withErrors([
-                    'produit_id' => 'Aucun prix unitaire défini pour ce parfum et cette contenance. Renseignez-le d’abord dans Prix Unitaire.',
+                    'produit_id' => 'Aucun prix détail défini pour ce parfum et cette contenance. Renseignez-le sur la fiche du parfum.',
                 ]);
         }
 
