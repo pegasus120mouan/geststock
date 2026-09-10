@@ -5,6 +5,11 @@
 @section('content')
 @php
   $fmt = fn ($n) => number_format((float) $n, 0, ',', ' ');
+  $openSection = request('section', 'en_gros');
+  if (! in_array($openSection, ['en_gros', 'detail'], true)) {
+    $openSection = 'en_gros';
+  }
+  $allPrix = $prixEnGros->concat($prixDetail);
 @endphp
 
 <div class="content-wrapper">
@@ -12,7 +17,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div>
         <h4 class="mb-1">Prix unitaire</h4>
-        <p class="mb-0 text-muted">Référence, contenance, catégorie et tarif — cliquez une référence pour voir les parfums</p>
+        <p class="mb-0 text-muted">Référence, contenance et tarif — cliquez une référence pour voir les parfums</p>
       </div>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNouveauPrix">
         <i class="bx bx-plus me-1"></i>Ajouter un prix
@@ -29,7 +34,7 @@
     <form method="GET" action="{{ route('prix-unitaires.index') }}" class="card mb-4">
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-md-4">
+          <div class="col-md-5">
             <label class="form-label">Recherche</label>
             <input
               type="text"
@@ -38,7 +43,7 @@
               placeholder="Référence, parfum ou flacon…"
               value="{{ request('q') }}" />
           </div>
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label">Contenance</label>
             <select name="flacon_id" class="form-select">
               <option value="">Toutes</option>
@@ -50,81 +55,62 @@
             </select>
           </div>
           <div class="col-md-3">
-            <label class="form-label">Catégorie</label>
-            <select name="categorie" class="form-select">
-              <option value="">Toutes</option>
-              @foreach ($categories as $value => $label)
-                <option value="{{ $value }}" @selected(request('categorie') === $value)>{{ $label }}</option>
-              @endforeach
-            </select>
-          </div>
-          <div class="col-md-2">
+            <input type="hidden" name="section" value="{{ $openSection }}" />
             <button class="btn btn-outline-primary w-100" type="submit">Filtrer</button>
           </div>
         </div>
       </div>
     </form>
 
-    <div class="card">
-      <div class="table-responsive text-nowrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Référence</th>
-              <th>Contenance</th>
-              <th>Catégorie</th>
-              <th>Prix unitaire</th>
-              <th>Parfums</th>
-              <th class="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @forelse ($prixUnitaires as $prix)
-              <tr>
-                <td>
-                  <a href="{{ route('prix-unitaires.show', $prix) }}" class="fw-semibold text-primary text-decoration-none">
-                    {{ $prix->reference }}
-                  </a>
-                </td>
-                <td>{{ $prix->flacon ? $prix->flacon->contenance_ml.' ml' : '—' }}</td>
-                <td>
-                  <span class="badge {{ $prix->categorie === 'en_gros' ? 'bg-label-info' : 'bg-label-primary' }}">
-                    {{ $prix->categorieLabel() }}
-                  </span>
-                </td>
-                <td class="fw-semibold text-primary">{{ $fmt($prix->prix) }} FCFA</td>
-                <td>
-                  <span class="badge bg-label-secondary">{{ $prix->produits_count }}</span>
-                </td>
-                <td class="text-end">
-                  <a href="{{ route('prix-unitaires.show', $prix) }}" class="btn btn-sm btn-outline-primary" title="Voir">
-                    <i class="bx bx-show"></i>
-                  </a>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger"
-                    title="Supprimer"
-                    data-bs-toggle="modal"
-                    data-bs-target="#modalDeletePrix{{ $prix->id }}">
-                    <i class="bx bx-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            @empty
-              <tr>
-                <td colspan="6" class="text-center py-5 text-muted">
-                  Aucun prix unitaire enregistré.
-                </td>
-              </tr>
-            @endforelse
-          </tbody>
-        </table>
+    <div class="row g-3 mb-4" id="prixSectionTabs">
+      <div class="col-md-6">
+        <button
+          type="button"
+          class="card w-100 text-start border-0 shadow-none prix-section-card {{ $openSection === 'en_gros' ? 'prix-section-active' : '' }}"
+          data-section="en_gros"
+          style="{{ $openSection === 'en_gros' ? 'background: linear-gradient(135deg, #03c3ec, #0aa2c0);' : 'background: #e7f8fc;' }}">
+          <div class="card-body d-flex justify-content-between align-items-center py-4">
+            <div>
+              <div class="text-uppercase small fw-semibold mb-1 {{ $openSection === 'en_gros' ? 'text-white' : 'text-info' }}" style="opacity: .9;">Catégorie</div>
+              <h4 class="mb-0 {{ $openSection === 'en_gros' ? 'text-white' : 'text-heading' }}">Prix de gros</h4>
+            </div>
+            <div class="{{ $openSection === 'en_gros' ? 'text-white' : 'text-info' }}" style="font-size: 2rem; font-weight: 700; line-height: 1;">
+              {{ $prixEnGros->count() }}
+            </div>
+          </div>
+        </button>
       </div>
-      @if ($prixUnitaires->hasPages())
-        <div class="card-footer">
-          {{ $prixUnitaires->links() }}
-        </div>
-      @endif
+      <div class="col-md-6">
+        <button
+          type="button"
+          class="card w-100 text-start border-0 shadow-none prix-section-card {{ $openSection === 'detail' ? 'prix-section-active' : '' }}"
+          data-section="detail"
+          style="{{ $openSection === 'detail' ? 'background: linear-gradient(135deg, #696cff, #5a5fe0);' : 'background: #efefff;' }}">
+          <div class="card-body d-flex justify-content-between align-items-center py-4">
+            <div>
+              <div class="text-uppercase small fw-semibold mb-1 {{ $openSection === 'detail' ? 'text-white' : 'text-primary' }}" style="opacity: .9;">Catégorie</div>
+              <h4 class="mb-0 {{ $openSection === 'detail' ? 'text-white' : 'text-heading' }}">Prix en détail</h4>
+            </div>
+            <div class="{{ $openSection === 'detail' ? 'text-white' : 'text-primary' }}" style="font-size: 2rem; font-weight: 700; line-height: 1;">
+              {{ $prixDetail->count() }}
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <div class="card" id="panelEnGros" @if ($openSection !== 'en_gros') style="display: none;" @endif>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Liste des prix de gros</h5>
+      </div>
+      @include('prix-unitaires._table', ['prixUnitaires' => $prixEnGros, 'fmt' => $fmt, 'emptyMessage' => 'Aucun prix de gros enregistré.'])
+    </div>
+
+    <div class="card" id="panelDetail" @if ($openSection !== 'detail') style="display: none;" @endif>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Liste des prix en détail</h5>
+      </div>
+      @include('prix-unitaires._table', ['prixUnitaires' => $prixDetail, 'fmt' => $fmt, 'emptyMessage' => 'Aucun prix en détail enregistré.'])
     </div>
 
     <div class="modal fade" id="modalNouveauPrix" tabindex="-1" aria-hidden="true">
@@ -203,7 +189,7 @@
       </div>
     </div>
 
-    @foreach ($prixUnitaires as $prix)
+    @foreach ($allPrix as $prix)
       <div class="modal fade" id="modalDeletePrix{{ $prix->id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
@@ -232,6 +218,50 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
+        var sectionInput = document.querySelector('input[name="section"]');
+        var panelEnGros = document.getElementById('panelEnGros');
+        var panelDetail = document.getElementById('panelDetail');
+        var cards = document.querySelectorAll('.prix-section-card');
+
+        function setSection(section) {
+          var isGros = section === 'en_gros';
+          if (sectionInput) sectionInput.value = section;
+          if (panelEnGros) panelEnGros.style.display = isGros ? '' : 'none';
+          if (panelDetail) panelDetail.style.display = isGros ? 'none' : '';
+
+          cards.forEach(function (card) {
+            var active = card.dataset.section === section;
+            var isGrosCard = card.dataset.section === 'en_gros';
+            card.classList.toggle('prix-section-active', active);
+            card.style.background = active
+              ? (isGrosCard ? 'linear-gradient(135deg, #03c3ec, #0aa2c0)' : 'linear-gradient(135deg, #696cff, #5a5fe0)')
+              : (isGrosCard ? '#e7f8fc' : '#efefff');
+
+            var label = card.querySelector('.text-uppercase');
+            var title = card.querySelector('h4');
+            var count = card.querySelector('.card-body > div:last-child');
+            if (label) {
+              label.className = 'text-uppercase small fw-semibold mb-1 ' + (active ? 'text-white' : (isGrosCard ? 'text-info' : 'text-primary'));
+              label.style.opacity = '.9';
+            }
+            if (title) {
+              title.className = 'mb-0 ' + (active ? 'text-white' : 'text-heading');
+            }
+            if (count) {
+              count.className = active ? 'text-white' : (isGrosCard ? 'text-info' : 'text-primary');
+              count.style.fontSize = '2rem';
+              count.style.fontWeight = '700';
+              count.style.lineHeight = '1';
+            }
+          });
+        }
+
+        cards.forEach(function (card) {
+          card.addEventListener('click', function () {
+            setSection(card.dataset.section);
+          });
+        });
+
         function sanitize(value) {
           return String(value || '').replace(/\s/g, '').replace(/[^\d]/g, '');
         }

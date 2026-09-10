@@ -14,6 +14,7 @@ class Commande extends Model
         'reference',
         'produit_id',
         'flacon_id',
+        'categorie',
         'quantite',
         'prix_unitaire',
         'date_commande',
@@ -44,10 +45,23 @@ class Commande extends Model
         $tarif = PrixUnitaire::trouver(
             (int) $this->produit_id,
             (int) $this->flacon_id,
-            PrixUnitaire::CATEGORIE_DETAIL
+            $this->categorie ?: PrixUnitaire::CATEGORIE_DETAIL
         );
 
         return (float) ($tarif?->prix ?? 0);
+    }
+
+    public function isEnGros(): bool
+    {
+        return $this->categorie === PrixUnitaire::CATEGORIE_EN_GROS;
+    }
+
+    public function categorieLabel(): string
+    {
+        return match ($this->categorie) {
+            PrixUnitaire::CATEGORIE_EN_GROS => 'En gros',
+            default => 'Détail',
+        };
     }
 
     public function montant(): float

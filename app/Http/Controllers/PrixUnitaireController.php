@@ -12,7 +12,7 @@ class PrixUnitaireController extends Controller
 {
     public function index(Request $request)
     {
-        $prixUnitaires = PrixUnitaire::query()
+        $baseQuery = PrixUnitaire::query()
             ->with(['flacon'])
             ->withCount('produits')
             ->when($request->filled('q'), function ($query) use ($request) {
@@ -24,13 +24,19 @@ class PrixUnitaireController extends Controller
                 });
             })
             ->when($request->filled('flacon_id'), fn ($q) => $q->where('flacon_id', $request->integer('flacon_id')))
-            ->when($request->filled('categorie'), fn ($q) => $q->where('categorie', $request->string('categorie')))
-            ->latest()
-            ->paginate(15)
-            ->withQueryString();
+            ->latest();
+
+        $prixEnGros = (clone $baseQuery)
+            ->where('categorie', PrixUnitaire::CATEGORIE_EN_GROS)
+            ->get();
+
+        $prixDetail = (clone $baseQuery)
+            ->where('categorie', PrixUnitaire::CATEGORIE_DETAIL)
+            ->get();
 
         return view('prix-unitaires.index', [
-            'prixUnitaires' => $prixUnitaires,
+            'prixEnGros' => $prixEnGros,
+            'prixDetail' => $prixDetail,
             'flacons' => Flacon::query()->actif()->orderBy('contenance_ml')->get(['id', 'nom', 'contenance_ml']),
             'categories' => PrixUnitaire::categories(),
             'produits' => Produit::query()->where('statut', 'actif')->orderBy('nom')->get(['id', 'nom']),

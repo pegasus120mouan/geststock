@@ -33,7 +33,7 @@ class CommandeController extends Controller
                 }
             });
 
-        $commandes = Commande::query()
+        $baseQuery = Commande::query()
             ->with(['user', 'produit', 'flacon'])
             ->when($request->filled('q'), function ($query) use ($request) {
                 $q = '%'.$request->string('q').'%';
@@ -45,9 +45,19 @@ class CommandeController extends Controller
                 });
             })
             ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
-            ->latest()
-            ->paginate(15)
-            ->withQueryString();
+            ->latest();
+
+        $commandesEnGros = (clone $baseQuery)
+            ->where('categorie', PrixUnitaire::CATEGORIE_EN_GROS)
+            ->get();
+
+        $commandesDetail = (clone $baseQuery)
+            ->where(function ($q) {
+                $q->where('categorie', PrixUnitaire::CATEGORIE_DETAIL)
+                    ->orWhereNull('categorie')
+                    ->orWhere('categorie', '');
+            })
+            ->get();
 
         $produits = Produit::query()
             ->where('statut', 'actif')
@@ -59,7 +69,7 @@ class CommandeController extends Controller
             ->orderBy('contenance_ml')
             ->get(['id', 'nom', 'contenance_ml']);
 
-        return view('commandes.index', compact('commandes', 'produits', 'flacons'));
+        return view('commandes.index', compact('commandesEnGros', 'commandesDetail', 'produits', 'flacons'));
     }
 
     public function store(Request $request)
@@ -67,6 +77,7 @@ class CommandeController extends Controller
         $validated = $request->validate([
             'produit_id' => ['required', 'integer', Rule::exists('produits', 'id')],
             'flacon_id' => ['required', 'integer', Rule::exists('flacons', 'id')],
+            'categorie' => ['required', Rule::in(array_keys(PrixUnitaire::categories()))],
             'quantite' => ['required', 'integer', 'min:1'],
             'client_nom' => ['nullable', 'string', 'max:255'],
             'client_telephone' => ['required', 'string', 'max:50'],
@@ -77,15 +88,17 @@ class CommandeController extends Controller
         $tarif = PrixUnitaire::trouver(
             (int) $validated['produit_id'],
             (int) $validated['flacon_id'],
-            PrixUnitaire::CATEGORIE_DETAIL
+            $validated['categorie']
         );
 
         if (! $tarif) {
+            $label = $validated['categorie'] === PrixUnitaire::CATEGORIE_EN_GROS ? 'en gros' : 'détail';
+
             return redirect()
-                ->route('commandes.index', ['create' => 1])
+                ->route('commandes.index', ['create' => 1, 'section' => $validated['categorie']])
                 ->withInput()
                 ->withErrors([
-                    'produit_id' => 'Aucun prix détail défini pour ce parfum et cette contenance. Renseignez-le sur la fiche du parfum.',
+                    'produit_id' => "Aucun prix {$label} défini pour ce parfum et cette contenance. Renseignez-le d'abord.",
                 ]);
         }
 
@@ -110,13 +123,13 @@ class CommandeController extends Controller
             });
         } catch (ValidationException $e) {
             return redirect()
-                ->route('commandes.index', ['create' => 1])
+                ->route('commandes.index', ['create' => 1, 'section' => $validated['categorie']])
                 ->withInput()
                 ->withErrors($e->errors());
         }
 
         return redirect()
-            ->route('commandes.index')
+            ->route('commandes.index', ['section' => $validated['categorie']])
             ->with('success', 'Commande créée avec succès.');
     }
 
@@ -130,7 +143,7 @@ class CommandeController extends Controller
         $ancienStatut = $commande->statut;
 
         if ($ancienStatut === $nouveauStatut) {
-            return redirect()->route('commandes.index');
+            return redirect()->route('commandes.index', ['section' => $commande->categorie ?: 'detail']);
         }
 
         try {
@@ -150,12 +163,12 @@ class CommandeController extends Controller
             });
         } catch (ValidationException $e) {
             return redirect()
-                ->route('commandes.index')
+                ->route('commandes.index', ['section' => $commande->categorie ?: 'detail'])
                 ->withErrors($e->errors());
         }
 
         return redirect()
-            ->route('commandes.index')
+            ->route('commandes.index', ['section' => $commande->categorie ?: 'detail'])
             ->with('success', 'Statut de la commande mis à jour.');
     }
 
