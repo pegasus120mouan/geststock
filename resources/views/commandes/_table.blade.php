@@ -2,6 +2,7 @@
   <table class="table mb-0">
     <thead>
       <tr>
+        <th>Date commande</th>
         <th>Référence</th>
         <th>Parfum</th>
         <th>Contenance</th>
@@ -11,12 +12,12 @@
         <th>Client</th>
         <th>Téléphone</th>
         <th>Statut</th>
-        <th>Date commande</th>
       </tr>
     </thead>
     <tbody>
       @forelse ($commandes as $commande)
         <tr>
+          <td>{{ $commande->date_commande?->format('d/m/Y') ?? $commande->created_at?->format('d/m/Y') }}</td>
           <td class="fw-medium">{{ $commande->reference }}</td>
           <td>{{ $commande->produit?->nom ?? '—' }}</td>
           <td>{{ $commande->flacon ? $commande->flacon->contenance_ml.' ml' : '—' }}</td>
@@ -41,7 +42,6 @@
               </select>
             </form>
           </td>
-          <td>{{ $commande->date_commande?->format('d/m/Y') ?? $commande->created_at?->format('d/m/Y') }}</td>
         </tr>
       @empty
         <tr>

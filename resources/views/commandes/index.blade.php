@@ -137,7 +137,17 @@
             @csrf
             <div class="modal-body">
               <div class="row g-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
+                  <label class="form-label">Date commande <span class="text-danger">*</span></label>
+                  <input
+                    type="date"
+                    name="date_commande"
+                    class="form-control @error('date_commande') is-invalid @enderror"
+                    value="{{ old('date_commande') }}"
+                    required />
+                  @error('date_commande')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-4">
                   <label class="form-label">Catégorie <span class="text-danger">*</span></label>
                   <select name="categorie" class="form-select @error('categorie') is-invalid @enderror" required>
                     <option value="en_gros" @selected(old('categorie', $openSection) === 'en_gros')>En gros</option>
@@ -145,7 +155,7 @@
                   </select>
                   @error('categorie')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <label class="form-label">Statut</label>
                   <select name="statut" class="form-select @error('statut') is-invalid @enderror" required>
                     <option value="en_attente" @selected(old('statut', 'en_attente') === 'en_attente')>En attente</option>

@@ -79,6 +79,7 @@ class CommandeController extends Controller
             'flacon_id' => ['required', 'integer', Rule::exists('flacons', 'id')],
             'categorie' => ['required', Rule::in(array_keys(PrixUnitaire::categories()))],
             'quantite' => ['required', 'integer', 'min:1'],
+            'date_commande' => ['required', 'date'],
             'client_nom' => ['nullable', 'string', 'max:255'],
             'client_telephone' => ['required', 'string', 'max:50'],
             'statut' => ['required', 'in:en_attente,confirmee,livree,annulee'],
@@ -111,7 +112,6 @@ class CommandeController extends Controller
                     ...$validated,
                     'prix_unitaire' => $prixUnitaire,
                     'total' => $montant,
-                    'date_commande' => now()->toDateString(),
                     'reference' => $this->generateReference(),
                     'user_id' => Auth::id(),
                 ]);
