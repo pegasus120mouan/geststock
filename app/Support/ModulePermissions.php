@@ -20,6 +20,10 @@ class ModulePermissions
 
     public const PRIX_UNITAIRES = 'prix_unitaires';
 
+    public const COMMUNES = 'communes';
+
+    public const COUTS_LIVRAISON = 'couts_livraison';
+
     /**
      * Modules consultables par un gestionnaire (l'admin coche lesquels).
      *
@@ -36,6 +40,8 @@ class ModulePermissions
             self::STOCK => 'Stock',
             self::COMMANDES => 'Commandes',
             self::PRIX_UNITAIRES => 'Prix unitaires',
+            self::COMMUNES => 'Communes',
+            self::COUTS_LIVRAISON => 'Coût de livraison',
         ];
     }
 
@@ -62,6 +68,8 @@ class ModulePermissions
             str_starts_with($routeName, 'stock.') => self::STOCK,
             str_starts_with($routeName, 'commandes.') => self::COMMANDES,
             str_starts_with($routeName, 'prix-unitaires.') => self::PRIX_UNITAIRES,
+            str_starts_with($routeName, 'communes.') => self::COMMUNES,
+            str_starts_with($routeName, 'couts-livraison.') => self::COUTS_LIVRAISON,
             str_starts_with($routeName, 'utilisateurs.') => null,
             default => null,
         };
@@ -77,6 +85,8 @@ class ModulePermissions
             self::FLACONS => 'flacons.index',
             self::COCKTAILS => 'cocktails.index',
             self::PRIX_UNITAIRES => 'prix-unitaires.index',
+            self::COMMUNES => 'communes.index',
+            self::COUTS_LIVRAISON => 'couts-livraison.index',
             self::FINANCE => 'finance.bilan-mois',
         ];
 

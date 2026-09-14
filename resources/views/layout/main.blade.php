@@ -321,7 +321,7 @@
             </li>
           @endcanView
 
-          @if (auth()->user()?->canView('commandes') || auth()->user()?->canView('prix_unitaires'))
+          @if (auth()->user()?->canView('commandes') || auth()->user()?->canView('prix_unitaires') || auth()->user()?->canView('communes') || auth()->user()?->canView('couts_livraison'))
           <li class="menu-header">Ventes</li>
           @endif
 
@@ -353,6 +353,52 @@
                     <div class="text-truncate">Liste des prix</div>
                   </a>
                 </li>
+              </ul>
+            </li>
+          @endcanView
+
+          @canView('communes')
+            <li class="menu-item {{ request()->routeIs('communes.*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons bx bx-map"></i>
+                <div class="text-truncate">Communes</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->routeIs('communes.index') && !request()->boolean('create') ? 'active' : '' }}">
+                  <a href="{{ route('communes.index') }}" class="menu-link">
+                    <div class="text-truncate">Liste des communes</div>
+                  </a>
+                </li>
+                @canWrite
+                <li class="menu-item {{ request()->boolean('create') && request()->routeIs('communes.*') ? 'active' : '' }}">
+                  <a href="{{ route('communes.index', ['create' => 1]) }}" class="menu-link">
+                    <div class="text-truncate">Ajouter une commune</div>
+                  </a>
+                </li>
+                @endcanWrite
+              </ul>
+            </li>
+          @endcanView
+
+          @canView('couts_livraison')
+            <li class="menu-item {{ request()->routeIs('couts-livraison.*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons bx bx-trip"></i>
+                <div class="text-truncate">Coût de livraison</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->routeIs('couts-livraison.index') && !request()->boolean('create') ? 'active' : '' }}">
+                  <a href="{{ route('couts-livraison.index') }}" class="menu-link">
+                    <div class="text-truncate">Liste des coûts</div>
+                  </a>
+                </li>
+                @canWrite
+                <li class="menu-item {{ request()->boolean('create') && request()->routeIs('couts-livraison.*') ? 'active' : '' }}">
+                  <a href="{{ route('couts-livraison.index', ['create' => 1]) }}" class="menu-link">
+                    <div class="text-truncate">Ajouter un coût</div>
+                  </a>
+                </li>
+                @endcanWrite
               </ul>
             </li>
           @endcanView

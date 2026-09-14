@@ -3,6 +3,8 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CocktailController;
 use App\Http\Controllers\CommandeController;
+use App\Http\Controllers\CommuneController;
+use App\Http\Controllers\CoutLivraisonController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FlaconController;
@@ -47,6 +49,9 @@ Route::middleware(['auth', 'module'])->group(function () {
     Route::post('/prix-unitaires/{prixUnitaire}/produits', [PrixUnitaireController::class, 'attachProduit'])->name('prix-unitaires.produits.attach');
     Route::delete('/prix-unitaires/{prixUnitaire}/produits/{produit}', [PrixUnitaireController::class, 'detachProduit'])->name('prix-unitaires.produits.detach');
     Route::delete('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'destroy'])->name('prix-unitaires.destroy');
+
+    Route::resource('communes', CommuneController::class)->except(['show', 'create', 'edit']);
+    Route::resource('couts-livraison', CoutLivraisonController::class)->except(['show', 'create', 'edit']);
 
     Route::resource('utilisateurs', UtilisateurController::class)->except(['show']);
 });

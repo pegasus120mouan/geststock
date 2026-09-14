@@ -187,6 +187,25 @@
                     placeholder="Optionnel"
                     value="{{ old('client_nom') }}" />
                 </div>
+                <div class="col-md-6">
+                  <label class="form-label">Commune <span class="text-danger">*</span></label>
+                  <select name="commune_id" class="form-select commune-select" required>
+                    <option value="" data-frais="0">Sélectionner une commune</option>
+                    @foreach ($communes as $commune)
+                      <option
+                        value="{{ $commune->id }}"
+                        data-frais="{{ (float) ($commune->coutLivraison?->montant ?? 0) }}"
+                        @selected((string) old('commune_id') === (string) $commune->id)>
+                        {{ $commune->nom }}
+                      </option>
+                    @endforeach
+                  </select>
+                  @error('commune_id')<div class="text-danger mt-1">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Coût de livraison</label>
+                  <div class="form-control-plaintext fw-semibold text-primary frais-livraison-display">—</div>
+                </div>
                 <div class="col-12">
                   <label class="form-label">Notes</label>
                   <input
@@ -348,6 +367,35 @@
                       class="form-control"
                       value="{{ $isThisEdit ? old('client_nom', $commande->client_nom) : $commande->client_nom }}" />
                   </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Commune <span class="text-danger">*</span></label>
+                    @php $communeVal = $isThisEdit ? old('commune_id', $commande->commune_id) : $commande->commune_id; @endphp
+                    <select name="commune_id" class="form-select commune-select" required>
+                      <option value="" data-frais="0">Sélectionner une commune</option>
+                      @foreach ($communes as $commune)
+                        <option
+                          value="{{ $commune->id }}"
+                          data-frais="{{ (float) ($commune->coutLivraison?->montant ?? 0) }}"
+                          @selected((string) $communeVal === (string) $commune->id)>
+                          {{ $commune->nom }}
+                        </option>
+                      @endforeach
+                      @if ($commande->commune && ! $communes->contains('id', $commande->commune_id))
+                        <option
+                          value="{{ $commande->commune->id }}"
+                          data-frais="{{ (float) $commande->frais_livraison }}"
+                          selected>
+                          {{ $commande->commune->nom }}
+                        </option>
+                      @endif
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Coût de livraison</label>
+                    <div class="form-control-plaintext fw-semibold text-primary frais-livraison-display">
+                      {{ number_format((float) $commande->frais_livraison, 0, ',', ' ') }} FCFA
+                    </div>
+                  </div>
                   <div class="col-12">
                     <label class="form-label">Notes</label>
                     <input
@@ -472,6 +520,27 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
+        function formatFr(n) {
+          var v = Math.round(Number(n) || 0);
+          return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        }
+
+        function bindCommuneSelect(select) {
+          if (!select) return;
+          var display = select.closest('.row, form').querySelector('.frais-livraison-display');
+          function sync() {
+            var opt = select.options[select.selectedIndex];
+            var frais = opt ? Number(opt.getAttribute('data-frais') || 0) : 0;
+            if (display) {
+              display.textContent = select.value ? (formatFr(frais) + ' FCFA') : '—';
+            }
+          }
+          select.addEventListener('change', sync);
+          sync();
+        }
+
+        document.querySelectorAll('.commune-select').forEach(bindCommuneSelect);
+
         var sectionInput = document.querySelector('input[name="section"]');
         var panelEnGros = document.getElementById('panelCommandesEnGros');
         var panelDetail = document.getElementById('panelCommandesDetail');

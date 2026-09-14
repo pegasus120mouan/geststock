@@ -6,7 +6,9 @@
         <th>Référence</th>
         <th>Articles</th>
         <th>Catégories</th>
+        <th>Commune</th>
         <th>Montant</th>
+        <th>Coût livraison</th>
         <th>Client</th>
         <th>Téléphone</th>
         <th>Statut</th>
@@ -38,7 +40,9 @@
               </span>
             @endforeach
           </td>
-          <td class="fw-semibold text-primary">{{ $fmt($commande->montant()) }} FCFA</td>
+          <td>{{ $commande->commune?->nom ?? '—' }}</td>
+          <td class="fw-semibold text-primary">{{ $fmt($commande->montantArticles()) }} FCFA</td>
+          <td class="fw-semibold">{{ $fmt($commande->frais_livraison) }} FCFA</td>
           <td>{{ $commande->client_nom ?: '—' }}</td>
           <td>{{ $commande->client_telephone }}</td>
           <td style="min-width: 160px;">
@@ -70,7 +74,7 @@
           </td>
         </tr>
         <tr class="collapse" id="lignesCommande{{ $section ?? 'all' }}_{{ $commande->id }}">
-          <td colspan="9" class="bg-label-secondary bg-opacity-10">
+          <td colspan="11" class="bg-label-secondary bg-opacity-10">
             <div class="p-3">
               <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -99,6 +103,18 @@
                         <td class="fw-semibold">{{ $fmt($ligne->montant()) }} FCFA</td>
                       </tr>
                     @endforeach
+                    <tr>
+                      <td colspan="5" class="text-end text-muted">Sous-total parfums</td>
+                      <td class="fw-semibold">{{ $fmt($commande->montantArticles()) }} FCFA</td>
+                    </tr>
+                    <tr>
+                      <td colspan="5" class="text-end text-muted">Coût livraison ({{ $commande->commune?->nom ?? '—' }})</td>
+                      <td class="fw-semibold">{{ $fmt($commande->frais_livraison) }} FCFA</td>
+                    </tr>
+                    <tr>
+                      <td colspan="5" class="text-end fw-semibold">Total</td>
+                      <td class="fw-bold text-primary">{{ $fmt($commande->montant()) }} FCFA</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -107,7 +123,7 @@
         </tr>
       @empty
         <tr>
-          <td colspan="9" class="text-center py-5 text-muted">
+          <td colspan="11" class="text-center py-5 text-muted">
             {{ $emptyMessage }}
           </td>
         </tr>

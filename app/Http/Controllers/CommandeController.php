@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\VolumeUnit;
 use App\Models\Commande;
 use App\Models\CommandeLigne;
+use App\Models\Commune;
+use App\Models\CoutLivraison;
 use App\Models\Flacon;
 use App\Models\PrixUnitaire;
 use App\Models\Produit;
@@ -21,7 +23,7 @@ class CommandeController extends Controller
     public function index(Request $request)
     {
         $baseQuery = Commande::query()
-            ->with(['lignes.produit', 'lignes.flacon'])
+            ->with(['lignes.produit', 'lignes.flacon', 'commune'])
             ->withCount('lignes')
             ->when($request->filled('q'), function ($query) use ($request) {
                 $q = '%'.$request->string('q').'%';
@@ -29,6 +31,7 @@ class CommandeController extends Controller
                     $inner->where('reference', 'like', $q)
                         ->orWhere('client_nom', 'like', $q)
                         ->orWhere('client_telephone', 'like', $q)
+                        ->orWhereHas('commune', fn ($c) => $c->where('nom', 'like', $q))
                         ->orWhereHas('lignes.produit', fn ($p) => $p->where('nom', 'like', $q));
                 });
             })
@@ -53,6 +56,13 @@ class CommandeController extends Controller
             ->orderBy('contenance_ml')
             ->get(['id', 'nom', 'contenance_ml']);
 
+        $communes = Commune::query()
+            ->actif()
+            ->with(['coutLivraison' => fn ($q) => $q->where('statut', 'actif')])
+            ->whereHas('coutLivraison', fn ($q) => $q->where('statut', 'actif'))
+            ->orderBy('nom')
+            ->get(['id', 'nom']);
+
         $allCommandes = $commandesEnGros->concat($commandesDetail)->unique('id')->values();
 
         return view('commandes.index', compact(
@@ -60,7 +70,8 @@ class CommandeController extends Controller
             'commandesDetail',
             'allCommandes',
             'produits',
-            'flacons'
+            'flacons',
+            'communes'
         ));
     }
 
@@ -73,14 +84,18 @@ class CommandeController extends Controller
             return $lignesPreparees;
         }
 
-        $totalCommande = round(collect($lignesPreparees)->sum('total'), 2);
+        $fraisLivraison = $this->fraisLivraisonPourCommune((int) $validated['commune_id']);
+        $totalArticles = round(collect($lignesPreparees)->sum('total'), 2);
+        $totalCommande = round($totalArticles + $fraisLivraison, 2);
 
         try {
-            DB::transaction(function () use ($validated, $lignesPreparees, $totalCommande) {
+            DB::transaction(function () use ($validated, $lignesPreparees, $totalCommande, $fraisLivraison) {
                 $commande = Commande::query()->create([
                     'date_commande' => $validated['date_commande'],
                     'client_nom' => $validated['client_nom'] ?? null,
                     'client_telephone' => $validated['client_telephone'],
+                    'commune_id' => $validated['commune_id'],
+                    'frais_livraison' => $fraisLivraison,
                     'statut' => $validated['statut'],
                     'notes' => $validated['notes'] ?? null,
                     'total' => $totalCommande,
@@ -118,7 +133,9 @@ class CommandeController extends Controller
             return $lignesPreparees;
         }
 
-        $totalCommande = round(collect($lignesPreparees)->sum('total'), 2);
+        $fraisLivraison = $this->fraisLivraisonPourCommune((int) $validated['commune_id']);
+        $totalArticles = round(collect($lignesPreparees)->sum('total'), 2);
+        $totalCommande = round($totalArticles + $fraisLivraison, 2);
         $section = $request->input('section', 'en_gros');
         $ancienStatut = $commande->statut;
         $nouveauStatut = $validated['statut'];
@@ -129,6 +146,7 @@ class CommandeController extends Controller
                 $validated,
                 $lignesPreparees,
                 $totalCommande,
+                $fraisLivraison,
                 $ancienStatut,
                 $nouveauStatut
             ) {
@@ -143,6 +161,8 @@ class CommandeController extends Controller
                     'date_commande' => $validated['date_commande'],
                     'client_nom' => $validated['client_nom'] ?? null,
                     'client_telephone' => $validated['client_telephone'],
+                    'commune_id' => $validated['commune_id'],
+                    'frais_livraison' => $fraisLivraison,
                     'statut' => $nouveauStatut,
                     'notes' => $validated['notes'] ?? null,
                     'total' => $totalCommande,
@@ -217,6 +237,7 @@ class CommandeController extends Controller
             'date_commande' => ['required', 'date'],
             'client_nom' => ['nullable', 'string', 'max:255'],
             'client_telephone' => ['required', 'string', 'max:50'],
+            'commune_id' => ['required', 'integer', Rule::exists('communes', 'id')],
             'statut' => ['required', 'in:en_attente,confirmee,livree,annulee'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'lignes' => ['required', 'array', 'min:1'],
@@ -225,12 +246,29 @@ class CommandeController extends Controller
             'lignes.*.categorie' => ['required', Rule::in(array_keys(PrixUnitaire::categories()))],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
         ], [
+            'commune_id.required' => 'Sélectionnez une commune.',
             'lignes.required' => 'Ajoutez au moins un parfum à la commande.',
             'lignes.*.produit_id.required' => 'Sélectionnez un parfum.',
             'lignes.*.flacon_id.required' => 'Sélectionnez une contenance.',
             'lignes.*.categorie.required' => 'Sélectionnez une catégorie.',
             'lignes.*.quantite.required' => 'Indiquez la quantité.',
         ]);
+    }
+
+    private function fraisLivraisonPourCommune(int $communeId): float
+    {
+        $cout = CoutLivraison::query()
+            ->where('commune_id', $communeId)
+            ->where('statut', 'actif')
+            ->first();
+
+        if (! $cout) {
+            throw ValidationException::withMessages([
+                'commune_id' => 'Aucun coût de livraison actif pour cette commune.',
+            ]);
+        }
+
+        return round((float) $cout->montant, 2);
     }
 
     /**

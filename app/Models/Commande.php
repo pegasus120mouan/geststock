@@ -16,6 +16,8 @@ class Commande extends Model
         'date_commande',
         'client_nom',
         'client_telephone',
+        'commune_id',
+        'frais_livraison',
         'statut',
         'total',
         'notes',
@@ -26,6 +28,7 @@ class Commande extends Model
     {
         return [
             'date_commande' => 'date',
+            'frais_livraison' => 'decimal:2',
             'total' => 'decimal:2',
         ];
     }
@@ -35,9 +38,19 @@ class Commande extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function commune(): BelongsTo
+    {
+        return $this->belongsTo(Commune::class);
+    }
+
     public function lignes(): HasMany
     {
         return $this->hasMany(CommandeLigne::class)->orderBy('id');
+    }
+
+    public function montantArticles(): float
+    {
+        return round((float) $this->lignes->sum(fn (CommandeLigne $l) => $l->montant()), 2);
     }
 
     public function montant(): float
@@ -46,13 +59,13 @@ class Commande extends Model
             return (float) $this->total;
         }
 
-        return round((float) $this->lignes->sum(fn (CommandeLigne $l) => $l->montant()), 2);
+        return round($this->montantArticles() + (float) $this->frais_livraison, 2);
     }
 
     public function recalculerTotal(): void
     {
         $this->forceFill([
-            'total' => round((float) $this->lignes()->sum('total'), 2),
+            'total' => round($this->montantArticles() + (float) $this->frais_livraison, 2),
         ])->save();
     }
 
