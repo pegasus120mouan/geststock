@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\VolumeUnit;
 use App\Models\Commande;
+use App\Models\CommandeLigne;
 use App\Models\Flacon;
 use App\Models\PrixUnitaire;
 use App\Models\Produit;
@@ -19,44 +20,27 @@ class CommandeController extends Controller
 {
     public function index(Request $request)
     {
-        // Corrige les anciennes commandes enregistrées à 0 alors qu'un tarif existe.
-        Commande::query()
-            ->where(function ($q) {
-                $q->where('prix_unitaire', '<=', 0)->orWhere('total', '<=', 0);
-            })
-            ->whereNotNull('produit_id')
-            ->whereNotNull('flacon_id')
-            ->orderBy('id')
-            ->chunkById(50, function ($commandes) {
-                foreach ($commandes as $commande) {
-                    $commande->synchroniserPrixDepuisTarif();
-                }
-            });
-
         $baseQuery = Commande::query()
-            ->with(['user', 'produit', 'flacon'])
+            ->with(['lignes.produit', 'lignes.flacon'])
+            ->withCount('lignes')
             ->when($request->filled('q'), function ($query) use ($request) {
                 $q = '%'.$request->string('q').'%';
                 $query->where(function ($inner) use ($q) {
                     $inner->where('reference', 'like', $q)
                         ->orWhere('client_nom', 'like', $q)
                         ->orWhere('client_telephone', 'like', $q)
-                        ->orWhereHas('produit', fn ($p) => $p->where('nom', 'like', $q));
+                        ->orWhereHas('lignes.produit', fn ($p) => $p->where('nom', 'like', $q));
                 });
             })
             ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
             ->latest();
 
         $commandesEnGros = (clone $baseQuery)
-            ->where('categorie', PrixUnitaire::CATEGORIE_EN_GROS)
+            ->whereHas('lignes', fn ($q) => $q->where('categorie', PrixUnitaire::CATEGORIE_EN_GROS))
             ->get();
 
         $commandesDetail = (clone $baseQuery)
-            ->where(function ($q) {
-                $q->where('categorie', PrixUnitaire::CATEGORIE_DETAIL)
-                    ->orWhereNull('categorie')
-                    ->orWhere('categorie', '');
-            })
+            ->whereHas('lignes', fn ($q) => $q->where('categorie', PrixUnitaire::CATEGORIE_DETAIL))
             ->get();
 
         $produits = Produit::query()
@@ -75,61 +59,90 @@ class CommandeController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'produit_id' => ['required', 'integer', Rule::exists('produits', 'id')],
-            'flacon_id' => ['required', 'integer', Rule::exists('flacons', 'id')],
-            'categorie' => ['required', Rule::in(array_keys(PrixUnitaire::categories()))],
-            'quantite' => ['required', 'integer', 'min:1'],
             'date_commande' => ['required', 'date'],
             'client_nom' => ['nullable', 'string', 'max:255'],
             'client_telephone' => ['required', 'string', 'max:50'],
             'statut' => ['required', 'in:en_attente,confirmee,livree,annulee'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'lignes' => ['required', 'array', 'min:1'],
+            'lignes.*.produit_id' => ['required', 'integer', Rule::exists('produits', 'id')],
+            'lignes.*.flacon_id' => ['required', 'integer', Rule::exists('flacons', 'id')],
+            'lignes.*.categorie' => ['required', Rule::in(array_keys(PrixUnitaire::categories()))],
+            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+        ], [
+            'lignes.required' => 'Ajoutez au moins un parfum à la commande.',
+            'lignes.*.produit_id.required' => 'Sélectionnez un parfum.',
+            'lignes.*.flacon_id.required' => 'Sélectionnez une contenance.',
+            'lignes.*.categorie.required' => 'Sélectionnez une catégorie.',
+            'lignes.*.quantite.required' => 'Indiquez la quantité.',
         ]);
 
-        $tarif = PrixUnitaire::trouver(
-            (int) $validated['produit_id'],
-            (int) $validated['flacon_id'],
-            $validated['categorie']
-        );
+        $lignesPreparees = [];
 
-        if (! $tarif) {
-            $label = $validated['categorie'] === PrixUnitaire::CATEGORIE_EN_GROS ? 'en gros' : 'détail';
+        foreach ($validated['lignes'] as $index => $ligne) {
+            $tarif = PrixUnitaire::trouver(
+                (int) $ligne['produit_id'],
+                (int) $ligne['flacon_id'],
+                $ligne['categorie']
+            );
 
-            return redirect()
-                ->route('commandes.index', ['create' => 1, 'section' => $validated['categorie']])
-                ->withInput()
-                ->withErrors([
-                    'produit_id' => "Aucun prix {$label} défini pour ce parfum et cette contenance. Renseignez-le d'abord.",
-                ]);
+            if (! $tarif) {
+                $label = $ligne['categorie'] === PrixUnitaire::CATEGORIE_EN_GROS ? 'en gros' : 'détail';
+
+                return redirect()
+                    ->route('commandes.index', ['create' => 1])
+                    ->withInput()
+                    ->withErrors([
+                        "lignes.$index.produit_id" => "Aucun prix {$label} pour cette ligne (parfum + contenance).",
+                    ]);
+            }
+
+            $prix = (float) $tarif->prix;
+            $qte = (int) $ligne['quantite'];
+
+            $lignesPreparees[] = [
+                'produit_id' => (int) $ligne['produit_id'],
+                'flacon_id' => (int) $ligne['flacon_id'],
+                'categorie' => $ligne['categorie'],
+                'quantite' => $qte,
+                'prix_unitaire' => $prix,
+                'total' => round($prix * $qte, 2),
+            ];
         }
 
-        $prixUnitaire = (float) $tarif->prix;
-        $montant = round($prixUnitaire * (int) $validated['quantite'], 2);
+        $totalCommande = round(collect($lignesPreparees)->sum('total'), 2);
 
         try {
-            DB::transaction(function () use ($validated, $prixUnitaire, $montant) {
+            DB::transaction(function () use ($validated, $lignesPreparees, $totalCommande) {
                 $commande = Commande::query()->create([
-                    ...$validated,
-                    'prix_unitaire' => $prixUnitaire,
-                    'total' => $montant,
+                    'date_commande' => $validated['date_commande'],
+                    'client_nom' => $validated['client_nom'] ?? null,
+                    'client_telephone' => $validated['client_telephone'],
+                    'statut' => $validated['statut'],
+                    'notes' => $validated['notes'] ?? null,
+                    'total' => $totalCommande,
                     'reference' => $this->generateReference(),
                     'user_id' => Auth::id(),
                 ]);
 
+                foreach ($lignesPreparees as $ligne) {
+                    $commande->lignes()->create($ligne);
+                }
+
                 if ($commande->statut === 'livree') {
-                    $commande->load(['produit', 'flacon']);
+                    $commande->load(['lignes.produit', 'lignes.flacon']);
                     $this->deduireStock($commande);
                 }
             });
         } catch (ValidationException $e) {
             return redirect()
-                ->route('commandes.index', ['create' => 1, 'section' => $validated['categorie']])
+                ->route('commandes.index', ['create' => 1])
                 ->withInput()
                 ->withErrors($e->errors());
         }
 
         return redirect()
-            ->route('commandes.index', ['section' => $validated['categorie']])
+            ->route('commandes.index')
             ->with('success', 'Commande créée avec succès.');
     }
 
@@ -141,15 +154,16 @@ class CommandeController extends Controller
 
         $nouveauStatut = $validated['statut'];
         $ancienStatut = $commande->statut;
+        $section = $request->input('section', 'en_gros');
 
         if ($ancienStatut === $nouveauStatut) {
-            return redirect()->route('commandes.index', ['section' => $commande->categorie ?: 'detail']);
+            return redirect()->route('commandes.index', ['section' => $section]);
         }
 
         try {
             DB::transaction(function () use ($commande, $ancienStatut, $nouveauStatut) {
                 $commande = Commande::query()->lockForUpdate()->findOrFail($commande->id);
-                $commande->load(['produit', 'flacon']);
+                $commande->load(['lignes.produit', 'lignes.flacon']);
 
                 if ($ancienStatut !== 'livree' && $nouveauStatut === 'livree') {
                     $this->deduireStock($commande);
@@ -163,43 +177,55 @@ class CommandeController extends Controller
             });
         } catch (ValidationException $e) {
             return redirect()
-                ->route('commandes.index', ['section' => $commande->categorie ?: 'detail'])
+                ->route('commandes.index', ['section' => $section])
                 ->withErrors($e->errors());
         }
 
         return redirect()
-            ->route('commandes.index', ['section' => $commande->categorie ?: 'detail'])
+            ->route('commandes.index', ['section' => $section])
             ->with('success', 'Statut de la commande mis à jour.');
-    }
-
-    private function volumeCommandeMl(Commande $commande): float
-    {
-        $contenance = (int) ($commande->flacon?->contenance_ml ?? 0);
-        $quantite = (int) $commande->quantite;
-
-        return round($contenance * $quantite, 2);
     }
 
     private function deduireStock(Commande $commande): void
     {
-        if (! $commande->produit_id || ! $commande->flacon) {
+        if ($commande->lignes->isEmpty()) {
             throw ValidationException::withMessages([
-                'statut' => 'Impossible de livrer : parfum ou contenance manquant.',
+                'statut' => 'Impossible de livrer : aucune ligne de commande.',
             ]);
         }
 
-        $volumeMl = $this->volumeCommandeMl($commande);
+        foreach ($commande->lignes as $ligne) {
+            $this->appliquerMouvementStock($commande, $ligne, 'sortie');
+        }
+    }
+
+    private function restaurerStock(Commande $commande): void
+    {
+        foreach ($commande->lignes as $ligne) {
+            $this->appliquerMouvementStock($commande, $ligne, 'entree');
+        }
+    }
+
+    private function appliquerMouvementStock(Commande $commande, CommandeLigne $ligne, string $type): void
+    {
+        if (! $ligne->produit_id || ! $ligne->flacon) {
+            throw ValidationException::withMessages([
+                'statut' => 'Impossible de modifier le stock : parfum ou contenance manquant sur une ligne.',
+            ]);
+        }
+
+        $volumeMl = $ligne->volumeMl();
 
         if ($volumeMl <= 0) {
             throw ValidationException::withMessages([
-                'statut' => 'Volume à déduire invalide.',
+                'statut' => 'Volume invalide sur une ligne de commande.',
             ]);
         }
 
-        $produit = Produit::query()->lockForUpdate()->findOrFail($commande->produit_id);
+        $produit = Produit::query()->lockForUpdate()->findOrFail($ligne->produit_id);
         $stockAvant = (float) $produit->stock_ml;
 
-        if ($stockAvant < $volumeMl) {
+        if ($type === 'sortie' && $stockAvant < $volumeMl) {
             throw ValidationException::withMessages([
                 'statut' => sprintf(
                     'Stock insuffisant pour %s : %s ml requis, %s ml disponibles.',
@@ -210,51 +236,25 @@ class CommandeController extends Controller
             ]);
         }
 
-        $stockApres = round($stockAvant - $volumeMl, 2);
+        $stockApres = $type === 'sortie'
+            ? round($stockAvant - $volumeMl, 2)
+            : round($stockAvant + $volumeMl, 2);
+
         $produit->update(['stock_ml' => $stockApres]);
 
         StockMouvement::query()->create([
             'produit_id' => $produit->id,
             'user_id' => Auth::id(),
-            'type' => 'sortie',
+            'type' => $type,
             'quantite' => $volumeMl,
             'unite' => VolumeUnit::Ml,
             'quantite_ml' => $volumeMl,
             'stock_avant' => $stockAvant,
             'stock_apres' => $stockApres,
-            'commentaire' => 'Livraison commande '.$commande->reference.
-                ' ('.$commande->flacon->contenance_ml.' ml × '.$commande->quantite.')',
-        ]);
-    }
-
-    private function restaurerStock(Commande $commande): void
-    {
-        if (! $commande->produit_id || ! $commande->flacon) {
-            return;
-        }
-
-        $volumeMl = $this->volumeCommandeMl($commande);
-
-        if ($volumeMl <= 0) {
-            return;
-        }
-
-        $produit = Produit::query()->lockForUpdate()->findOrFail($commande->produit_id);
-        $stockAvant = (float) $produit->stock_ml;
-        $stockApres = round($stockAvant + $volumeMl, 2);
-        $produit->update(['stock_ml' => $stockApres]);
-
-        StockMouvement::query()->create([
-            'produit_id' => $produit->id,
-            'user_id' => Auth::id(),
-            'type' => 'entree',
-            'quantite' => $volumeMl,
-            'unite' => VolumeUnit::Ml,
-            'quantite_ml' => $volumeMl,
-            'stock_avant' => $stockAvant,
-            'stock_apres' => $stockApres,
-            'commentaire' => 'Annulation livraison commande '.$commande->reference.
-                ' ('.$commande->flacon->contenance_ml.' ml × '.$commande->quantite.')',
+            'commentaire' => ($type === 'sortie' ? 'Livraison' : 'Annulation livraison').
+                ' commande '.$commande->reference.
+                ' ('.$ligne->flacon->contenance_ml.' ml × '.$ligne->quantite.
+                ' — '.$ligne->categorieLabel().')',
         ]);
     }
 

@@ -4,10 +4,8 @@
       <tr>
         <th>Date commande</th>
         <th>Référence</th>
-        <th>Parfum</th>
-        <th>Contenance</th>
-        <th>Qté</th>
-        <th>Prix unitaire</th>
+        <th>Articles</th>
+        <th>Catégories</th>
         <th>Montant</th>
         <th>Client</th>
         <th>Téléphone</th>
@@ -18,11 +16,27 @@
       @forelse ($commandes as $commande)
         <tr>
           <td>{{ $commande->date_commande?->format('d/m/Y') ?? $commande->created_at?->format('d/m/Y') }}</td>
-          <td class="fw-medium">{{ $commande->reference }}</td>
-          <td>{{ $commande->produit?->nom ?? '—' }}</td>
-          <td>{{ $commande->flacon ? $commande->flacon->contenance_ml.' ml' : '—' }}</td>
-          <td>{{ $commande->quantite }}</td>
-          <td>{{ $fmt($commande->prixEffectif()) }} FCFA</td>
+          <td class="fw-medium">
+            <button
+              type="button"
+              class="btn btn-link p-0 text-heading fw-medium text-decoration-none"
+              data-bs-toggle="collapse"
+              data-bs-target="#lignesCommande{{ $section ?? 'all' }}_{{ $commande->id }}"
+              aria-expanded="false">
+              {{ $commande->reference }}
+            </button>
+          </td>
+          <td>
+            <span class="badge bg-label-secondary">{{ $commande->lignes_count ?? $commande->lignes->count() }}</span>
+            <span class="text-muted ms-1">{{ $commande->resumeParfums() }}</span>
+          </td>
+          <td>
+            @foreach ($commande->categoriesPresentes() as $cat)
+              <span class="badge {{ $cat === 'en_gros' ? 'bg-label-info' : 'bg-label-primary' }}">
+                {{ $cat === 'en_gros' ? 'En gros' : 'Détail' }}
+              </span>
+            @endforeach
+          </td>
           <td class="fw-semibold text-primary">{{ $fmt($commande->montant()) }} FCFA</td>
           <td>{{ $commande->client_nom ?: '—' }}</td>
           <td>{{ $commande->client_telephone }}</td>
@@ -30,6 +44,7 @@
             <form method="POST" action="{{ route('commandes.statut', $commande) }}" class="m-0">
               @csrf
               @method('PATCH')
+              <input type="hidden" name="section" value="{{ $section ?? 'en_gros' }}" />
               <select
                 name="statut"
                 class="form-select form-select-sm border-0 {{ $commande->statutBadgeClass() }}"
@@ -43,9 +58,45 @@
             </form>
           </td>
         </tr>
+        <tr class="collapse" id="lignesCommande{{ $section ?? 'all' }}_{{ $commande->id }}">
+          <td colspan="8" class="bg-label-secondary bg-opacity-10">
+            <div class="p-3">
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr>
+                      <th>Parfum</th>
+                      <th>Contenance</th>
+                      <th>Catégorie</th>
+                      <th>Qté</th>
+                      <th>Prix unitaire</th>
+                      <th>Montant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @foreach ($commande->lignes as $ligne)
+                      <tr>
+                        <td>{{ $ligne->produit?->nom ?? '—' }}</td>
+                        <td>{{ $ligne->flacon ? $ligne->flacon->contenance_ml.' ml' : '—' }}</td>
+                        <td>
+                          <span class="badge {{ $ligne->isEnGros() ? 'bg-label-info' : 'bg-label-primary' }}">
+                            {{ $ligne->categorieLabel() }}
+                          </span>
+                        </td>
+                        <td>{{ $ligne->quantite }}</td>
+                        <td>{{ $fmt($ligne->prix_unitaire) }} FCFA</td>
+                        <td class="fw-semibold">{{ $fmt($ligne->montant()) }} FCFA</td>
+                      </tr>
+                    @endforeach
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
       @empty
         <tr>
-          <td colspan="10" class="text-center py-5 text-muted">
+          <td colspan="8" class="text-center py-5 text-muted">
             {{ $emptyMessage }}
           </td>
         </tr>

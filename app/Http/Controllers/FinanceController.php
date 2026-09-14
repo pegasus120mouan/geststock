@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Commande;
+use App\Models\CommandeLigne;
 use App\Models\Produit;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class FinanceController extends Controller
         $fin = (clone $debut)->endOfMonth();
 
         $commandes = Commande::query()
-            ->with(['produit', 'flacon'])
+            ->with(['lignes.produit', 'lignes.flacon'])
             ->whereBetween('date_commande', [$debut->toDateString(), $fin->toDateString()])
             ->orderByDesc('date_commande')
             ->get();
@@ -31,16 +32,20 @@ class FinanceController extends Controller
         $caLivre = (float) $commandes->where('statut', 'livree')->sum(fn (Commande $c) => $c->montant());
         $nbEnAttente = $commandes->where('statut', 'en_attente')->count();
 
-        $parParfum = $commandes
+        $parParfum = CommandeLigne::query()
+            ->whereHas('commande', function ($q) use ($debut, $fin) {
+                $q->whereBetween('date_commande', [$debut->toDateString(), $fin->toDateString()]);
+            })
+            ->with('produit')
+            ->get()
             ->groupBy('produit_id')
             ->map(function ($items) {
-                /** @var \Illuminate\Support\Collection<int, Commande> $items */
                 $first = $items->first();
 
                 return (object) [
                     'produit' => $first?->produit?->nom ?? '—',
                     'quantite' => $items->sum('quantite'),
-                    'montant' => (float) $items->sum(fn (Commande $c) => $c->montant()),
+                    'montant' => (float) $items->sum(fn (CommandeLigne $l) => $l->montant()),
                     'nb' => $items->count(),
                 ];
             })
@@ -91,13 +96,13 @@ class FinanceController extends Controller
             ];
         });
 
-        $topParfums = Commande::query()
+        $topParfums = CommandeLigne::query()
             ->select('produit_id')
             ->selectRaw('COUNT(*) as nb')
             ->selectRaw('SUM(quantite) as qte')
             ->selectRaw('COALESCE(SUM(total), 0) as ca')
             ->with('produit')
-            ->whereYear('date_commande', $annee)
+            ->whereHas('commande', fn ($q) => $q->whereYear('date_commande', $annee))
             ->groupBy('produit_id')
             ->orderByDesc('ca')
             ->limit(10)

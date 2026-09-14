@@ -126,7 +126,7 @@
                 <tr>
                   <th>Date</th>
                   <th>Réf.</th>
-                  <th>Parfum</th>
+                  <th>Articles</th>
                   <th>Statut</th>
                   <th>Montant</th>
                 </tr>
@@ -136,7 +136,7 @@
                   <tr>
                     <td>{{ $commande->date_commande?->format('d/m/Y') }}</td>
                     <td class="fw-medium">{{ $commande->reference }}</td>
-                    <td>{{ $commande->produit?->nom ?? '—' }}</td>
+                    <td>{{ $commande->resumeParfums() }}</td>
                     <td><span class="badge {{ $commande->statutBadgeClass() }}">{{ $commande->statutLabel() }}</span></td>
                     <td class="fw-semibold">{{ $fmt($commande->montant()) }} FCFA</td>
                   </tr>

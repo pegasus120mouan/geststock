@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Commande extends Model
 {
@@ -12,11 +13,6 @@ class Commande extends Model
 
     protected $fillable = [
         'reference',
-        'produit_id',
-        'flacon_id',
-        'categorie',
-        'quantite',
-        'prix_unitaire',
         'date_commande',
         'client_nom',
         'client_telephone',
@@ -29,39 +25,19 @@ class Commande extends Model
     protected function casts(): array
     {
         return [
-            'quantite' => 'integer',
-            'prix_unitaire' => 'decimal:2',
             'date_commande' => 'date',
             'total' => 'decimal:2',
         ];
     }
 
-    public function prixEffectif(): float
+    public function user(): BelongsTo
     {
-        if ((float) $this->prix_unitaire > 0) {
-            return (float) $this->prix_unitaire;
-        }
-
-        $tarif = PrixUnitaire::trouver(
-            (int) $this->produit_id,
-            (int) $this->flacon_id,
-            $this->categorie ?: PrixUnitaire::CATEGORIE_DETAIL
-        );
-
-        return (float) ($tarif?->prix ?? 0);
+        return $this->belongsTo(User::class);
     }
 
-    public function isEnGros(): bool
+    public function lignes(): HasMany
     {
-        return $this->categorie === PrixUnitaire::CATEGORIE_EN_GROS;
-    }
-
-    public function categorieLabel(): string
-    {
-        return match ($this->categorie) {
-            PrixUnitaire::CATEGORIE_EN_GROS => 'En gros',
-            default => 'Détail',
-        };
+        return $this->hasMany(CommandeLigne::class)->orderBy('id');
     }
 
     public function montant(): float
@@ -70,45 +46,46 @@ class Commande extends Model
             return (float) $this->total;
         }
 
-        return round($this->prixEffectif() * (int) $this->quantite, 2);
+        return round((float) $this->lignes->sum(fn (CommandeLigne $l) => $l->montant()), 2);
     }
 
-    /**
-     * Remplit prix_unitaire/total depuis le tarif si la commande a encore 0.
-     */
-    public function synchroniserPrixDepuisTarif(): bool
+    public function recalculerTotal(): void
     {
-        if ((float) $this->prix_unitaire > 0 && (float) $this->total > 0) {
-            return false;
-        }
-
-        $prix = $this->prixEffectif();
-
-        if ($prix <= 0) {
-            return false;
-        }
-
         $this->forceFill([
-            'prix_unitaire' => $prix,
-            'total' => round($prix * (int) $this->quantite, 2),
+            'total' => round((float) $this->lignes()->sum('total'), 2),
         ])->save();
-
-        return true;
     }
 
-    public function user(): BelongsTo
+    public function hasCategorie(string $categorie): bool
     {
-        return $this->belongsTo(User::class);
+        return $this->lignes->contains(fn (CommandeLigne $l) => $l->categorie === $categorie);
     }
 
-    public function produit(): BelongsTo
+    public function categoriesPresentes(): array
     {
-        return $this->belongsTo(Produit::class);
+        return $this->lignes
+            ->pluck('categorie')
+            ->unique()
+            ->values()
+            ->all();
     }
 
-    public function flacon(): BelongsTo
+    public function resumeParfums(int $limit = 2): string
     {
-        return $this->belongsTo(Flacon::class);
+        $noms = $this->lignes
+            ->map(fn (CommandeLigne $l) => $l->produit?->nom)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($noms->isEmpty()) {
+            return '—';
+        }
+
+        $affiche = $noms->take($limit)->implode(', ');
+        $reste = $noms->count() - $limit;
+
+        return $reste > 0 ? $affiche.' (+'.$reste.')' : $affiche;
     }
 
     public function statutLabel(): string
