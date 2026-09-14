@@ -103,20 +103,24 @@
                         <td class="fw-semibold">{{ $fmt($ligne->montant()) }} FCFA</td>
                       </tr>
                     @endforeach
-                    <tr>
-                      <td colspan="5" class="text-end text-muted">Sous-total parfums</td>
-                      <td class="fw-semibold">{{ $fmt($commande->montantArticles()) }} FCFA</td>
-                    </tr>
-                    <tr>
-                      <td colspan="5" class="text-end text-muted">Coût livraison ({{ $commande->commune?->nom ?? '—' }})</td>
-                      <td class="fw-semibold">{{ $fmt($commande->frais_livraison) }} FCFA</td>
-                    </tr>
-                    <tr>
-                      <td colspan="5" class="text-end fw-semibold">Total</td>
-                      <td class="fw-bold text-primary">{{ $fmt($commande->montant()) }} FCFA</td>
-                    </tr>
                   </tbody>
                 </table>
+                <div class="d-flex justify-content-center mt-3">
+                  <div style="min-width: 280px">
+                    <div class="d-flex justify-content-between gap-4 mb-1">
+                      <span class="text-muted">Sous-total parfums</span>
+                      <span class="fw-semibold">{{ $fmt($commande->montantArticles()) }} FCFA</span>
+                    </div>
+                    <div class="d-flex justify-content-between gap-4 mb-1">
+                      <span class="text-muted">Coût livraison ({{ $commande->commune?->nom ?? '—' }})</span>
+                      <span class="fw-semibold">{{ $fmt($commande->frais_livraison) }} FCFA</span>
+                    </div>
+                    <div class="d-flex justify-content-between gap-4 pt-1 border-top">
+                      <span class="fw-semibold">Total</span>
+                      <span class="fw-bold text-primary">{{ $fmt($commande->montant()) }} FCFA</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </td>
