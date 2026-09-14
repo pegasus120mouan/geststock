@@ -131,15 +131,14 @@
     </div>
 
     <div class="modal fade" id="modalNouvelleCommande" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
-        <div class="modal-content">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered" role="document">
+        <form method="POST" action="{{ route('commandes.store') }}" class="modal-content">
+          @csrf
           <div class="modal-header">
             <h5 class="modal-title">Ajouter une commande</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <form method="POST" action="{{ route('commandes.store') }}">
-            @csrf
-            <div class="modal-body">
+          <div class="modal-body">
               @if ($errors->any() && ! $editId)
                 <div class="alert alert-danger">
                   <ul class="mb-0">
@@ -266,13 +265,12 @@
                   </tbody>
                 </table>
               </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-              <button type="submit" class="btn btn-primary">Enregistrer</button>
-            </div>
-          </form>
-        </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -292,17 +290,16 @@
       @endphp
 
       <div class="modal fade" id="modalEditCommande{{ $commande->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Modifier {{ $commande->reference }}</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="{{ route('commandes.update', $commande) }}">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered" role="document">
+          <form method="POST" action="{{ route('commandes.update', $commande) }}" class="modal-content">
               @csrf
               @method('PUT')
               <input type="hidden" name="_edit_id" value="{{ $commande->id }}" />
               <input type="hidden" name="section" value="{{ $openSection }}" />
+              <div class="modal-header">
+                <h5 class="modal-title">Modifier {{ $commande->reference }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
               <div class="modal-body">
                 @if ($errors->any() && $isThisEdit)
                   <div class="alert alert-danger">
@@ -433,8 +430,7 @@
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
                 <button type="submit" class="btn btn-primary">Mettre à jour</button>
               </div>
-            </form>
-          </div>
+          </form>
         </div>
       </div>
     @endforeach
