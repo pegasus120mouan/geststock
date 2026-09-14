@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\ModulePermissions;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class UtilisateurController extends Controller
 {
@@ -11,7 +13,7 @@ class UtilisateurController extends Controller
     {
         $this->middleware(function ($request, $next) {
             abort_unless(auth()->check(), 401);
-            abort_unless(auth()->user()->role === 'admin', 403);
+            abort_unless(auth()->user()->isAdmin(), 403);
 
             return $next($request);
         });
@@ -34,6 +36,7 @@ class UtilisateurController extends Controller
 
         return view('utilisateurs.index', [
             'utilisateurs' => $query->paginate(20)->withQueryString(),
+            'modules' => ModulePermissions::catalog(),
         ]);
     }
 
@@ -44,16 +47,7 @@ class UtilisateurController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'prenom' => ['nullable', 'string', 'max:255'],
-            'login' => ['required', 'string', 'max:255', 'unique:users,login'],
-            'contact' => ['nullable', 'string', 'max:255', 'unique:users,contact'],
-            'matricule' => ['nullable', 'string', 'max:255', 'unique:users,matricule'],
-            'role' => ['required', 'in:admin,agent,driver'],
-            'password' => ['required', 'string', 'min:6', 'confirmed'],
-            'avatar' => ['nullable', 'image', 'max:2048'],
-        ]);
+        $validated = $this->validateUser($request);
 
         $pin = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
 
@@ -64,6 +58,9 @@ class UtilisateurController extends Controller
         $user->contact = $validated['contact'] ?? null;
         $user->matricule = $validated['matricule'] ?? null;
         $user->role = $validated['role'];
+        $user->permissions = $validated['role'] === 'gestionnaire'
+            ? array_values($validated['permissions'] ?? [])
+            : null;
         $user->password = $validated['password'];
         $user->code_pin = $pin;
         $user->avatar = $request->hasFile('avatar')
@@ -79,21 +76,15 @@ class UtilisateurController extends Controller
 
     public function edit(User $utilisateur)
     {
-        return view('utilisateurs.edit', compact('utilisateur'));
+        return view('utilisateurs.edit', [
+            'utilisateur' => $utilisateur,
+            'modules' => ModulePermissions::catalog(),
+        ]);
     }
 
     public function update(Request $request, User $utilisateur)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'prenom' => ['nullable', 'string', 'max:255'],
-            'login' => ['required', 'string', 'max:255', 'unique:users,login,'.$utilisateur->id],
-            'contact' => ['nullable', 'string', 'max:255', 'unique:users,contact,'.$utilisateur->id],
-            'matricule' => ['nullable', 'string', 'max:255', 'unique:users,matricule,'.$utilisateur->id],
-            'role' => ['required', 'in:admin,agent,driver'],
-            'password' => ['nullable', 'string', 'min:6', 'confirmed'],
-            'avatar' => ['nullable', 'image', 'max:2048'],
-        ]);
+        $validated = $this->validateUser($request, $utilisateur);
 
         $utilisateur->fill([
             'name' => $validated['name'],
@@ -102,6 +93,9 @@ class UtilisateurController extends Controller
             'contact' => $validated['contact'] ?? null,
             'matricule' => $validated['matricule'] ?? null,
             'role' => $validated['role'],
+            'permissions' => $validated['role'] === 'gestionnaire'
+                ? array_values($validated['permissions'] ?? [])
+                : null,
         ]);
 
         if ($request->hasFile('avatar')) {
@@ -124,5 +118,25 @@ class UtilisateurController extends Controller
         $utilisateur->delete();
 
         return redirect()->route('utilisateurs.index')->with('success', 'Utilisateur supprimé avec succès.');
+    }
+
+    private function validateUser(Request $request, ?User $utilisateur = null): array
+    {
+        $userId = $utilisateur?->id;
+
+        return $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'prenom' => ['nullable', 'string', 'max:255'],
+            'login' => ['required', 'string', 'max:255', Rule::unique('users', 'login')->ignore($userId)],
+            'contact' => ['nullable', 'string', 'max:255', Rule::unique('users', 'contact')->ignore($userId)],
+            'matricule' => ['nullable', 'string', 'max:255', Rule::unique('users', 'matricule')->ignore($userId)],
+            'role' => ['required', 'in:admin,gestionnaire'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', Rule::in(ModulePermissions::keys())],
+            'password' => [$utilisateur ? 'nullable' : 'required', 'string', 'min:6', 'confirmed'],
+            'avatar' => ['nullable', 'image', 'max:2048'],
+        ], [
+            'permissions.*.in' => 'Permission invalide.',
+        ]);
     }
 }

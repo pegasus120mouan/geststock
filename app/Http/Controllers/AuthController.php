@@ -37,7 +37,12 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        $user = Auth::user();
+        $home = $user && $user->isGestionnaire()
+            ? route(\App\Support\ModulePermissions::homeRouteForModules($user->viewPermissions()))
+            : route('dashboard');
+
+        return redirect()->intended($home);
     }
 
     public function logout(Request $request)

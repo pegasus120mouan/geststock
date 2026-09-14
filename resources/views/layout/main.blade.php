@@ -195,6 +195,7 @@
         <div class="menu-inner-shadow"></div>
 
         <ul class="menu-inner py-1">
+          @canView('dashboard')
           <li class="menu-header">Principal</li>
           <li class="menu-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <a href="{{ route('dashboard') }}" class="menu-link">
@@ -202,8 +203,13 @@
               <div class="text-truncate">Tableau de bord</div>
             </a>
           </li>
+          @endcanView
 
+          @if (auth()->user()?->canView('finance') || auth()->user()?->canView('produits') || auth()->user()?->canView('flacons') || auth()->user()?->canView('cocktails'))
           <li class="menu-header">Catalogue</li>
+          @endif
+
+          @canView('finance')
           <li class="menu-item {{ request()->routeIs('finance.*') ? 'active open' : '' }}">
             <a href="javascript:void(0);" class="menu-link menu-toggle">
               <i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i>
@@ -222,7 +228,9 @@
               </li>
             </ul>
           </li>
+          @endcanView
 
+          @canView('produits')
           <li class="menu-item {{ request()->routeIs('produits.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-package"></i>
@@ -234,14 +242,18 @@
                     <div class="text-truncate">Liste des parfums</div>
                   </a>
                 </li>
+                @canWrite
                 <li class="menu-item {{ request()->routeIs('produits.*') && request()->boolean('create') ? 'active' : '' }}">
                   <a href="{{ route('produits.index', ['create' => 1]) }}" class="menu-link">
                     <div class="text-truncate">Ajouter un parfum</div>
                   </a>
                 </li>
+                @endcanWrite
               </ul>
             </li>
+          @endcanView
 
+          @canView('flacons')
             <li class="menu-item {{ request()->routeIs('flacons.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-droplet"></i>
@@ -253,14 +265,18 @@
                     <div class="text-truncate">Liste des flacons</div>
                   </a>
                 </li>
+                @canWrite
                 <li class="menu-item {{ request()->boolean('create') && request()->routeIs('flacons.*') ? 'active' : '' }}">
                   <a href="{{ route('flacons.index', ['create' => 1]) }}" class="menu-link">
                     <div class="text-truncate">Ajouter un flacon</div>
                   </a>
                 </li>
+                @endcanWrite
               </ul>
             </li>
+          @endcanView
 
+          @canView('cocktails')
             <li class="menu-item {{ request()->routeIs('cocktails.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-drink"></i>
@@ -272,14 +288,18 @@
                     <div class="text-truncate">Liste des cocktails</div>
                   </a>
                 </li>
+                @canWrite
                 <li class="menu-item {{ request()->boolean('create') && request()->routeIs('cocktails.*') ? 'active' : '' }}">
                   <a href="{{ route('cocktails.index', ['create' => 1]) }}" class="menu-link">
                     <div class="text-truncate">Nouveau cocktail</div>
                   </a>
                 </li>
+                @endcanWrite
               </ul>
             </li>
+          @endcanView
 
+          @canView('stock')
           <li class="menu-header">Inventaire</li>
             <li class="menu-item {{ request()->routeIs('stock.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
@@ -299,8 +319,13 @@
                 </li>
               </ul>
             </li>
+          @endcanView
 
+          @if (auth()->user()?->canView('commandes') || auth()->user()?->canView('prix_unitaires'))
           <li class="menu-header">Ventes</li>
+          @endif
+
+          @canView('commandes')
             <li class="menu-item {{ request()->routeIs('commandes.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-cart"></i>
@@ -314,7 +339,9 @@
                 </li>
               </ul>
             </li>
+          @endcanView
 
+          @canView('prix_unitaires')
             <li class="menu-item {{ request()->routeIs('prix-unitaires.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-purchase-tag"></i>
@@ -328,8 +355,9 @@
                 </li>
               </ul>
             </li>
+          @endcanView
 
-          @if(auth()->user()?->role === 'admin')
+          @admin
             <li class="menu-header">Administration</li>
             <li class="menu-item {{ request()->routeIs('utilisateurs.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
@@ -344,7 +372,7 @@
                 </li>
               </ul>
             </li>
-          @endif
+          @endadmin
         </ul>
       </aside>
 
@@ -396,7 +424,7 @@
                         </div>
                         <div class="flex-grow-1">
                           <h6 class="mb-0">{{ auth()->user()->name }} {{ auth()->user()->prenom }}</h6>
-                          <small class="text-body-secondary">{{ auth()->user()->role }}</small>
+                          <small class="text-body-secondary">{{ auth()->user()->roleLabel() }}</small>
                         </div>
                       </div>
                     </a>
@@ -430,6 +458,25 @@
   <script src="{{ asset('assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.js') }}"></script>
   <script src="{{ asset('assets/vendor/js/menu.js') }}"></script>
   <script src="{{ asset('assets/js/main.js') }}"></script>
+  @unless(auth()->user()?->canWrite())
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll([
+        '[data-bs-target^="#modalNouveau"]',
+        '[data-bs-target^="#modalNouvelle"]',
+        '[data-bs-target^="#modalNouvel"]',
+        '[data-bs-target^="#modalDelete"]',
+        '[data-bs-target^="#modalEdit"]',
+        'button[title="Modifier"]',
+        'a[title="Modifier"]',
+        'button[title="Supprimer"]',
+        'a[title="Supprimer"]'
+      ].join(',')).forEach(function (el) {
+        el.classList.add('d-none');
+      });
+    });
+  </script>
+  @endunless
   @stack('scripts')
 </body>
 </html>

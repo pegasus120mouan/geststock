@@ -62,7 +62,19 @@
                 <td>{{ $u->login }}</td>
                 <td>{{ $u->contact }}</td>
                 <td>{{ $u->matricule }}</td>
-                <td>{{ $u->role }}</td>
+                <td>
+                  <span class="badge {{ $u->role === 'admin' ? 'bg-label-primary' : 'bg-label-info' }}">
+                    {{ $u->roleLabel() }}
+                  </span>
+                  @if ($u->isGestionnaire() && is_array($u->permissions) && count($u->permissions))
+                    <div class="small text-muted mt-1">
+                      {{ collect($u->permissions)->map(fn ($p) => $modules[$p] ?? $p)->take(3)->implode(', ') }}
+                      @if (count($u->permissions) > 3)
+                        +{{ count($u->permissions) - 3 }}
+                      @endif
+                    </div>
+                  @endif
+                </td>
                 <td class="text-end">
                   <a class="btn btn-sm btn-outline-primary" href="{{ route('utilisateurs.edit', $u) }}" title="Modifier">
                     <i class="bx bx-edit"></i>
@@ -124,17 +136,12 @@
               </div>
 
               
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Rôle</label>
-                  <select name="role" class="form-select" required>
-                    <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>admin</option>
-                    <option value="agent" {{ old('role') === 'agent' ? 'selected' : '' }}>agent</option>
-                    <option value="driver" {{ old('role') === 'driver' ? 'selected' : '' }}>driver</option>
-                  </select>
-                  @error('role')<div class="text-danger mt-1">{{ $message }}</div>@enderror
-                </div>
-              </div>
+              @include('utilisateurs._permissions', [
+                'modules' => $modules,
+                'roleSelectId' => 'create_role',
+                'roleValue' => old('role', 'gestionnaire'),
+                'selectedPermissions' => old('permissions', []),
+              ])
 
               <div class="row">
                 <div class="col-md-6 mb-3">
@@ -202,7 +209,7 @@
         <div class="bg-light rounded p-3 mb-3">
           <p class="mb-1"><strong>Nom:</strong> {{ $u->name }} {{ $u->prenom }}</p>
           <p class="mb-1"><strong>Login:</strong> {{ $u->login }}</p>
-          <p class="mb-0"><strong>Rôle:</strong> <span class="badge bg-secondary">{{ $u->role }}</span></p>
+          <p class="mb-0"><strong>Rôle:</strong> <span class="badge bg-secondary">{{ $u->roleLabel() }}</span></p>
         </div>
         <p class="text-danger mb-0"><i class="bx bx-info-circle me-1"></i>Cette action est irréversible.</p>
       </div>
@@ -238,7 +245,20 @@ function togglePassword(inputId, iconId) {
   }
 }
 
+function bindRolePermissions(select) {
+  if (!select) return;
+  var box = select.closest('form').querySelector('.permissions-box');
+  function sync() {
+    if (!box) return;
+    box.classList.toggle('d-none', select.value !== 'gestionnaire');
+  }
+  select.addEventListener('change', sync);
+  sync();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.role-select').forEach(bindRolePermissions);
+
   var passwordInput = document.getElementById('password');
   var confirmInput = document.getElementById('password_confirmation');
   var strengthDiv = document.getElementById('passwordStrength');

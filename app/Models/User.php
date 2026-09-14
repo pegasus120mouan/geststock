@@ -33,6 +33,7 @@ class User extends Authenticatable
         'password',
         'code_pin',
         'role',
+        'permissions',
     ];
 
     /**
@@ -55,7 +56,62 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'code_pin' => 'hashed',
+            'permissions' => 'array',
         ];
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isGestionnaire(): bool
+    {
+        return $this->role === 'gestionnaire';
+    }
+
+    public function canWrite(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    public function canView(string $module): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if (! $this->isGestionnaire()) {
+            return false;
+        }
+
+        $permissions = is_array($this->permissions) ? $this->permissions : [];
+
+        return in_array($module, $permissions, true);
+    }
+
+    /** @return list<string> */
+    public function viewPermissions(): array
+    {
+        if ($this->isAdmin()) {
+            return \App\Support\ModulePermissions::keys();
+        }
+
+        return array_values(array_intersect(
+            \App\Support\ModulePermissions::keys(),
+            is_array($this->permissions) ? $this->permissions : []
+        ));
+    }
+
+    public function roleLabel(): string
+    {
+        return match ($this->role) {
+            'admin' => 'Administrateur',
+            'gestionnaire' => 'Gestionnaire',
+            'agent' => 'Agent',
+            'driver' => 'Chauffeur',
+            default => ucfirst((string) $this->role),
+        };
     }
 
     public function getAvatarUrlAttribute(): string
