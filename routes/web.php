@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/commandes', [CommandeController::class, 'index'])->name('commandes.index');
     Route::post('/commandes', [CommandeController::class, 'store'])->name('commandes.store');
+    Route::put('/commandes/{commande}', [CommandeController::class, 'update'])->name('commandes.update');
     Route::patch('/commandes/{commande}/statut', [CommandeController::class, 'updateStatut'])->name('commandes.statut');
 
     Route::get('/prix-unitaires', [PrixUnitaireController::class, 'index'])->name('prix-unitaires.index');

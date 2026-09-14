@@ -10,6 +10,7 @@
         <th>Client</th>
         <th>Téléphone</th>
         <th>Statut</th>
+        <th class="text-end">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -57,9 +58,19 @@
               </select>
             </form>
           </td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary"
+              title="Modifier"
+              data-bs-toggle="modal"
+              data-bs-target="#modalEditCommande{{ $commande->id }}">
+              <i class="bx bx-edit"></i>
+            </button>
+          </td>
         </tr>
         <tr class="collapse" id="lignesCommande{{ $section ?? 'all' }}_{{ $commande->id }}">
-          <td colspan="8" class="bg-label-secondary bg-opacity-10">
+          <td colspan="9" class="bg-label-secondary bg-opacity-10">
             <div class="p-3">
               <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -96,7 +107,7 @@
         </tr>
       @empty
         <tr>
-          <td colspan="8" class="text-center py-5 text-muted">
+          <td colspan="9" class="text-center py-5 text-muted">
             {{ $emptyMessage }}
           </td>
         </tr>

@@ -9,6 +9,7 @@
   if (! in_array($openSection, ['en_gros', 'detail'], true)) {
     $openSection = 'en_gros';
   }
+  $editId = old('_edit_id', request('edit'));
   $oldLignes = old('lignes', [['categorie' => $openSection, 'produit_id' => '', 'flacon_id' => '', 'quantite' => 1]]);
 @endphp
 
@@ -139,7 +140,7 @@
           <form method="POST" action="{{ route('commandes.store') }}">
             @csrf
             <div class="modal-body">
-              @if ($errors->any())
+              @if ($errors->any() && ! $editId)
                 <div class="alert alert-danger">
                   <ul class="mb-0">
                     @foreach ($errors->all() as $error)
@@ -275,6 +276,169 @@
       </div>
     </div>
 
+    @foreach ($allCommandes as $commande)
+      @php
+        $isThisEdit = (string) $editId === (string) $commande->id;
+        $editRows = $isThisEdit && is_array(old('lignes'))
+          ? old('lignes')
+          : ($commande->lignes->isNotEmpty()
+            ? $commande->lignes->map(fn ($l) => [
+              'categorie' => $l->categorie,
+              'produit_id' => $l->produit_id,
+              'flacon_id' => $l->flacon_id,
+              'quantite' => $l->quantite,
+            ])->all()
+            : [['categorie' => 'detail', 'produit_id' => '', 'flacon_id' => '', 'quantite' => 1]]);
+      @endphp
+
+      <div class="modal fade" id="modalEditCommande{{ $commande->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Modifier {{ $commande->reference }}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ route('commandes.update', $commande) }}">
+              @csrf
+              @method('PUT')
+              <input type="hidden" name="_edit_id" value="{{ $commande->id }}" />
+              <input type="hidden" name="section" value="{{ $openSection }}" />
+              <div class="modal-body">
+                @if ($errors->any() && $isThisEdit)
+                  <div class="alert alert-danger">
+                    <ul class="mb-0">
+                      @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                      @endforeach
+                    </ul>
+                  </div>
+                @endif
+
+                <div class="row g-3 mb-4">
+                  <div class="col-md-3">
+                    <label class="form-label">Date commande <span class="text-danger">*</span></label>
+                    <input
+                      type="date"
+                      name="date_commande"
+                      class="form-control"
+                      value="{{ $isThisEdit ? old('date_commande', optional($commande->date_commande)->format('Y-m-d')) : optional($commande->date_commande)->format('Y-m-d') }}"
+                      required />
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Statut</label>
+                    <select name="statut" class="form-select" required>
+                      @php $statutVal = $isThisEdit ? old('statut', $commande->statut) : $commande->statut; @endphp
+                      <option value="en_attente" @selected($statutVal === 'en_attente')>En attente</option>
+                      <option value="confirmee" @selected($statutVal === 'confirmee')>Confirmée</option>
+                      <option value="livree" @selected($statutVal === 'livree')>Livrée</option>
+                      <option value="annulee" @selected($statutVal === 'annulee')>Annulée</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Téléphone <span class="text-danger">*</span></label>
+                    <input
+                      type="text"
+                      name="client_telephone"
+                      class="form-control"
+                      value="{{ $isThisEdit ? old('client_telephone', $commande->client_telephone) : $commande->client_telephone }}"
+                      required />
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Nom du client</label>
+                    <input
+                      type="text"
+                      name="client_nom"
+                      class="form-control"
+                      value="{{ $isThisEdit ? old('client_nom', $commande->client_nom) : $commande->client_nom }}" />
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <input
+                      type="text"
+                      name="notes"
+                      class="form-control"
+                      value="{{ $isThisEdit ? old('notes', $commande->notes) : $commande->notes }}" />
+                  </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="mb-0">Articles (parfum + catégorie + quantité)</h6>
+                  <button type="button" class="btn btn-sm btn-outline-primary btn-add-ligne-edit" data-target="editLignesCommande{{ $commande->id }}">
+                    <i class="bx bx-plus me-1"></i>Ajouter un parfum
+                  </button>
+                </div>
+
+                <div class="table-responsive">
+                  <table class="table" id="editLignesCommande{{ $commande->id }}">
+                    <thead>
+                      <tr>
+                        <th style="min-width: 140px;">Catégorie <span class="text-danger">*</span></th>
+                        <th style="min-width: 220px;">Parfum <span class="text-danger">*</span></th>
+                        <th style="min-width: 140px;">Contenance <span class="text-danger">*</span></th>
+                        <th style="min-width: 100px;">Qté <span class="text-danger">*</span></th>
+                        <th style="width: 60px;"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @foreach ($editRows as $index => $ligne)
+                        <tr class="ligne-commande">
+                          <td>
+                            <select name="lignes[{{ $index }}][categorie]" class="form-select" required>
+                              <option value="en_gros" @selected(($ligne['categorie'] ?? '') === 'en_gros')>En gros</option>
+                              <option value="detail" @selected(($ligne['categorie'] ?? '') === 'detail')>Détail</option>
+                            </select>
+                          </td>
+                          <td>
+                            <select name="lignes[{{ $index }}][produit_id]" class="form-select" required>
+                              <option value="">Sélectionner</option>
+                              @foreach ($produits as $produit)
+                                <option value="{{ $produit->id }}" @selected((string) ($ligne['produit_id'] ?? '') === (string) $produit->id)>
+                                  {{ $produit->nom }}
+                                </option>
+                              @endforeach
+                            </select>
+                          </td>
+                          <td>
+                            <select name="lignes[{{ $index }}][flacon_id]" class="form-select" required>
+                              <option value="">Sélectionner</option>
+                              @foreach ($flacons as $flacon)
+                                <option value="{{ $flacon->id }}" @selected((string) ($ligne['flacon_id'] ?? '') === (string) $flacon->id)>
+                                  {{ $flacon->label() }}
+                                </option>
+                              @endforeach
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              name="lignes[{{ $index }}][quantite]"
+                              class="form-control"
+                              min="1"
+                              step="1"
+                              value="{{ $ligne['quantite'] ?? 1 }}"
+                              required />
+                          </td>
+                          <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne-commande" title="Retirer">
+                              <i class="bx bx-trash"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      @endforeach
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="submit" class="btn btn-primary">Mettre à jour</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    @endforeach
+
     <template id="tplLigneCommande">
       <tr class="ligne-commande">
         <td>
@@ -316,9 +480,9 @@
         var panelEnGros = document.getElementById('panelCommandesEnGros');
         var panelDetail = document.getElementById('panelCommandesDetail');
         var cards = document.querySelectorAll('.commande-section-card');
-        var tbody = document.querySelector('#tableLignesCommande tbody');
+        var createTbody = document.querySelector('#tableLignesCommande tbody');
         var tpl = document.getElementById('tplLigneCommande').innerHTML;
-        var index = tbody.querySelectorAll('.ligne-commande').length;
+        var createIndex = createTbody.querySelectorAll('.ligne-commande').length;
 
         function setSection(section) {
           var isGros = section === 'en_gros';
@@ -357,21 +521,36 @@
         });
 
         document.getElementById('btnAddLigneCommande').addEventListener('click', function () {
-          tbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(index)));
-          index += 1;
+          createTbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(createIndex)));
+          createIndex += 1;
         });
 
-        tbody.addEventListener('click', function (e) {
+        document.querySelectorAll('.btn-add-ligne-edit').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var table = document.getElementById(btn.getAttribute('data-target'));
+            if (!table) return;
+            var tbody = table.querySelector('tbody');
+            var index = tbody.querySelectorAll('.ligne-commande').length;
+            tbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(index)));
+          });
+        });
+
+        document.addEventListener('click', function (e) {
           var btn = e.target.closest('.btn-remove-ligne-commande');
           if (!btn) return;
+          var tbody = btn.closest('tbody');
+          if (!tbody) return;
           var rows = tbody.querySelectorAll('.ligne-commande');
           if (rows.length <= 1) return;
           btn.closest('tr').remove();
         });
 
-        @if ($errors->any() || request()->boolean('create'))
-          var el = document.getElementById('modalNouvelleCommande');
-          if (el && window.bootstrap) new bootstrap.Modal(el).show();
+        @if (($errors->any() && ! $editId) || request()->boolean('create'))
+          var createEl = document.getElementById('modalNouvelleCommande');
+          if (createEl && window.bootstrap) new bootstrap.Modal(createEl).show();
+        @elseif ($editId)
+          var editEl = document.getElementById('modalEditCommande{{ $editId }}');
+          if (editEl && window.bootstrap) new bootstrap.Modal(editEl).show();
         @endif
       });
     </script>
