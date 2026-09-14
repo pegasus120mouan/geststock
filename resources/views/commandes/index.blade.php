@@ -11,6 +11,7 @@
   }
   $editId = old('_edit_id', request('edit'));
   $oldLignes = old('lignes', [['categorie' => $openSection, 'produit_id' => '', 'flacon_id' => '', 'quantite' => 1]]);
+  $produitsById = $produits->keyBy('id');
 @endphp
 
 <div class="content-wrapper">
@@ -28,6 +29,13 @@
     @if (session('success'))
       <div class="alert alert-success alert-dismissible fade show">
         {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    @endif
+
+    @if (session('error'))
+      <div class="alert alert-danger alert-dismissible fade show">
+        {{ session('error') }}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
       </div>
     @endif
@@ -245,14 +253,21 @@
                           </select>
                         </td>
                         <td>
-                          <select name="lignes[{{ $index }}][produit_id]" class="form-select" required>
-                            <option value="">Sélectionner</option>
-                            @foreach ($produits as $produit)
-                              <option value="{{ $produit->id }}" @selected((string) ($ligne['produit_id'] ?? '') === (string) $produit->id)>
-                                {{ $produit->nom }}
-                              </option>
-                            @endforeach
-                          </select>
+                          @php
+                            $pid = $ligne['produit_id'] ?? '';
+                            $pnom = $pid !== '' ? ($produitsById->get($pid)?->nom ?? '') : '';
+                          @endphp
+                          <div class="produit-autocomplete position-relative">
+                            <input type="hidden" name="lignes[{{ $index }}][produit_id]" class="produit-id-input" value="{{ $pid }}" required>
+                            <input
+                              type="text"
+                              class="form-control produit-search-input"
+                              value="{{ $pnom }}"
+                              placeholder="Taper le nom du parfum..."
+                              autocomplete="off"
+                              required />
+                            <div class="produit-suggestions list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 1080; max-height: 220px; overflow-y: auto;"></div>
+                          </div>
                         </td>
                         <td>
                           <select name="lignes[{{ $index }}][flacon_id]" class="form-select" required>
@@ -434,14 +449,21 @@
                             </select>
                           </td>
                           <td>
-                            <select name="lignes[{{ $index }}][produit_id]" class="form-select" required>
-                              <option value="">Sélectionner</option>
-                              @foreach ($produits as $produit)
-                                <option value="{{ $produit->id }}" @selected((string) ($ligne['produit_id'] ?? '') === (string) $produit->id)>
-                                  {{ $produit->nom }}
-                                </option>
-                              @endforeach
-                            </select>
+                            @php
+                              $pid = $ligne['produit_id'] ?? '';
+                              $pnom = $pid !== '' ? ($produitsById->get($pid)?->nom ?? '') : '';
+                            @endphp
+                            <div class="produit-autocomplete position-relative">
+                              <input type="hidden" name="lignes[{{ $index }}][produit_id]" class="produit-id-input" value="{{ $pid }}" required>
+                              <input
+                                type="text"
+                                class="form-control produit-search-input"
+                                value="{{ $pnom }}"
+                                placeholder="Taper le nom du parfum..."
+                                autocomplete="off"
+                                required />
+                              <div class="produit-suggestions list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 1080; max-height: 220px; overflow-y: auto;"></div>
+                            </div>
                           </td>
                           <td>
                             <select name="lignes[{{ $index }}][flacon_id]" class="form-select" required>
@@ -492,12 +514,17 @@
           </select>
         </td>
         <td>
-          <select name="lignes[__INDEX__][produit_id]" class="form-select" required>
-            <option value="">Sélectionner</option>
-            @foreach ($produits as $produit)
-              <option value="{{ $produit->id }}">{{ $produit->nom }}</option>
-            @endforeach
-          </select>
+          <div class="produit-autocomplete position-relative">
+            <input type="hidden" name="lignes[__INDEX__][produit_id]" class="produit-id-input" value="" required>
+            <input
+              type="text"
+              class="form-control produit-search-input"
+              value=""
+              placeholder="Taper le nom du parfum..."
+              autocomplete="off"
+              required />
+            <div class="produit-suggestions list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 1080; max-height: 220px; overflow-y: auto;"></div>
+          </div>
         </td>
         <td>
           <select name="lignes[__INDEX__][flacon_id]" class="form-select" required>
@@ -520,10 +547,144 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
+        var produitsCatalog = @json($produits->map(fn ($p) => ['id' => $p->id, 'nom' => $p->nom])->values());
+
         function formatFr(n) {
           var v = Math.round(Number(n) || 0);
           return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
         }
+
+        function normalizeText(value) {
+          return String(value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim();
+        }
+
+        function hideSuggestions(box) {
+          if (!box) return;
+          box.classList.add('d-none');
+          box.innerHTML = '';
+        }
+
+        function selectProduit(wrap, produit) {
+          var idInput = wrap.querySelector('.produit-id-input');
+          var searchInput = wrap.querySelector('.produit-search-input');
+          var box = wrap.querySelector('.produit-suggestions');
+          if (idInput) idInput.value = String(produit.id);
+          if (searchInput) searchInput.value = produit.nom;
+          hideSuggestions(box);
+        }
+
+        function escapeHtml(value) {
+          return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        }
+
+        function renderSuggestions(wrap, query) {
+          var box = wrap.querySelector('.produit-suggestions');
+          if (!box) return;
+
+          var q = normalizeText(query);
+          if (q.length < 1) {
+            hideSuggestions(box);
+            return;
+          }
+
+          var matches = produitsCatalog
+            .filter(function (p) { return normalizeText(p.nom).indexOf(q) !== -1; })
+            .slice(0, 12);
+
+          if (!matches.length) {
+            box.innerHTML = '<div class="list-group-item text-muted small">Aucun parfum trouvé</div>';
+            box.classList.remove('d-none');
+            return;
+          }
+
+          box.innerHTML = matches.map(function (p) {
+            return '<button type="button" class="list-group-item list-group-item-action produit-suggestion-item" data-id="' + escapeHtml(p.id) + '" data-nom="' + escapeHtml(p.nom) + '">' + escapeHtml(p.nom) + '</button>';
+          }).join('');
+          box.classList.remove('d-none');
+        }
+
+        function bindProduitAutocomplete(root) {
+          (root || document).querySelectorAll('.produit-autocomplete').forEach(function (wrap) {
+            if (wrap.dataset.bound === '1') return;
+            wrap.dataset.bound = '1';
+
+            var searchInput = wrap.querySelector('.produit-search-input');
+            var idInput = wrap.querySelector('.produit-id-input');
+            var box = wrap.querySelector('.produit-suggestions');
+            if (!searchInput || !idInput || !box) return;
+
+            searchInput.addEventListener('input', function () {
+              idInput.value = '';
+              renderSuggestions(wrap, searchInput.value);
+            });
+
+            searchInput.addEventListener('focus', function () {
+              if (searchInput.value.trim() !== '') {
+                renderSuggestions(wrap, searchInput.value);
+              }
+            });
+
+            searchInput.addEventListener('keydown', function (e) {
+              if (e.key === 'Escape') hideSuggestions(box);
+            });
+
+            box.addEventListener('mousedown', function (e) {
+              var item = e.target.closest('.produit-suggestion-item');
+              if (!item) return;
+              e.preventDefault();
+              selectProduit(wrap, {
+                id: item.getAttribute('data-id'),
+                nom: item.getAttribute('data-nom')
+              });
+            });
+
+            searchInput.addEventListener('blur', function () {
+              setTimeout(function () {
+                hideSuggestions(box);
+                if (!idInput.value && searchInput.value.trim() !== '') {
+                  var q = normalizeText(searchInput.value);
+                  var exact = produitsCatalog.find(function (p) {
+                    return normalizeText(p.nom) === q;
+                  });
+                  if (exact) {
+                    selectProduit(wrap, exact);
+                  }
+                }
+              }, 150);
+            });
+          });
+        }
+
+        bindProduitAutocomplete(document);
+
+        document.querySelectorAll('#modalNouvelleCommande form, form.modal-content').forEach(function (form) {
+          form.addEventListener('submit', function (e) {
+            var invalid = false;
+            form.querySelectorAll('.produit-autocomplete').forEach(function (wrap) {
+              var idInput = wrap.querySelector('.produit-id-input');
+              var searchInput = wrap.querySelector('.produit-search-input');
+              if (idInput && !idInput.value) {
+                invalid = true;
+                if (searchInput) searchInput.classList.add('is-invalid');
+              } else if (searchInput) {
+                searchInput.classList.remove('is-invalid');
+              }
+            });
+            if (invalid) {
+              e.preventDefault();
+              alert('Sélectionnez un parfum dans la liste de suggestions pour chaque ligne.');
+            }
+          });
+        });
 
         function bindCommuneSelect(select) {
           if (!select) return;
@@ -588,6 +749,7 @@
         document.getElementById('btnAddLigneCommande').addEventListener('click', function () {
           createTbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(createIndex)));
           createIndex += 1;
+          bindProduitAutocomplete(createTbody);
         });
 
         document.querySelectorAll('.btn-add-ligne-edit').forEach(function (btn) {
@@ -597,6 +759,7 @@
             var tbody = table.querySelector('tbody');
             var index = tbody.querySelectorAll('.ligne-commande').length;
             tbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(index)));
+            bindProduitAutocomplete(tbody);
           });
         });
 

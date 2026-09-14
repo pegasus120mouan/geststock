@@ -62,7 +62,24 @@
               </select>
             </form>
           </td>
-          <td class="text-end">
+          <td class="text-end text-nowrap">
+            @if ($commande->estEnvoyeeVersOvl())
+              <span class="badge bg-label-success me-1" title="Envoyée vers OVL{{ $commande->ovl_commande_id ? ' #'.$commande->ovl_commande_id : '' }}">
+                <i class="bx bx-check"></i> OVL
+              </span>
+            @else
+              <form method="POST" action="{{ route('commandes.envoyer-ovl', $commande) }}" class="d-inline">
+                @csrf
+                <input type="hidden" name="section" value="{{ $section ?? 'en_gros' }}" />
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-outline-success"
+                  title="Envoyer vers OVL pour livraison"
+                  onclick="return confirm('Envoyer cette commande vers OVL pour livraison ?');">
+                  <i class="bx bx-send"></i>
+                </button>
+              </form>
+            @endif
             <button
               type="button"
               class="btn btn-sm btn-outline-primary"

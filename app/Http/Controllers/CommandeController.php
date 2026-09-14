@@ -11,6 +11,7 @@ use App\Models\Flacon;
 use App\Models\PrixUnitaire;
 use App\Models\Produit;
 use App\Models\StockMouvement;
+use App\Services\OvlIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -229,6 +230,29 @@ class CommandeController extends Controller
         return redirect()
             ->route('commandes.index', ['section' => $section])
             ->with('success', 'Statut de la commande mis à jour.');
+    }
+
+    public function envoyerOvl(Request $request, Commande $commande, OvlIntegrationService $ovl)
+    {
+        $section = $request->input('section', 'en_gros');
+        $commande->loadMissing('commune');
+
+        try {
+            $result = $ovl->envoyerCommande($commande);
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('commandes.index', ['section' => $section])
+                ->with('error', $e->getMessage());
+        }
+
+        $message = $result['message'];
+        if ($result['id']) {
+            $message .= ' (OVL #'.$result['id'].')';
+        }
+
+        return redirect()
+            ->route('commandes.index', ['section' => $section])
+            ->with('success', $message);
     }
 
     private function validateCommande(Request $request): array

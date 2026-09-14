@@ -53,4 +53,11 @@ return [
         'camions_data_source' => env('CAMIONS_DATA_SOURCE', 'auto'),
     ],
 
+    'ovl' => [
+        'url' => env('OVL_API_URL'),
+        'identifiant' => env('OVL_INTEGRATION_ID'),
+        'token' => env('OVL_INTEGRATION_TOKEN'),
+        'timeout' => (int) env('OVL_TIMEOUT', 15),
+    ],
+
 ];

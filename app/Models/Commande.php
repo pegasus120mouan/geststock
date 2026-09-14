@@ -21,6 +21,8 @@ class Commande extends Model
         'statut',
         'total',
         'notes',
+        'ovl_commande_id',
+        'ovl_sent_at',
         'user_id',
     ];
 
@@ -30,6 +32,7 @@ class Commande extends Model
             'date_commande' => 'date',
             'frais_livraison' => 'decimal:2',
             'total' => 'decimal:2',
+            'ovl_sent_at' => 'datetime',
         ];
     }
 
@@ -121,5 +124,10 @@ class Commande extends Model
             'annulee' => 'bg-label-danger',
             default => 'bg-label-secondary',
         };
+    }
+
+    public function estEnvoyeeVersOvl(): bool
+    {
+        return $this->ovl_commande_id !== null || $this->ovl_sent_at !== null;
     }
 }

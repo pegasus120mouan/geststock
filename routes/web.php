@@ -41,6 +41,7 @@ Route::middleware(['auth', 'module'])->group(function () {
     Route::post('/commandes', [CommandeController::class, 'store'])->name('commandes.store');
     Route::put('/commandes/{commande}', [CommandeController::class, 'update'])->name('commandes.update');
     Route::patch('/commandes/{commande}/statut', [CommandeController::class, 'updateStatut'])->name('commandes.statut');
+    Route::post('/commandes/{commande}/envoyer-ovl', [CommandeController::class, 'envoyerOvl'])->name('commandes.envoyer-ovl');
 
     Route::get('/prix-unitaires', [PrixUnitaireController::class, 'index'])->name('prix-unitaires.index');
     Route::post('/prix-unitaires', [PrixUnitaireController::class, 'store'])->name('prix-unitaires.store');
