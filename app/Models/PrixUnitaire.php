@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PrixUnitaire extends Model
@@ -97,5 +99,74 @@ class PrixUnitaire extends Model
             'categorie' => $categorie,
             'prix' => $prix,
         ]);
+    }
+
+    /**
+     * Parfums ayant un tarif d'une catégorie mais pas de l'autre pour la même contenance.
+     *
+     * @return Collection<int, object{
+     *     produit_id: int,
+     *     produit_nom: string,
+     *     statut: string,
+     *     flacon_id: int,
+     *     contenance_ml: int,
+     *     categorie_presente: string,
+     *     categorie_manquante: string,
+     *     prix_id: int,
+     *     reference: string
+     * }>
+     */
+    public static function ecartsParfum(): Collection
+    {
+        $associations = DB::table('produit_prix_unitaire as ppu')
+            ->join('prix_unitaires as pu', 'pu.id', '=', 'ppu.prix_unitaire_id')
+            ->join('produits as p', 'p.id', '=', 'ppu.produit_id')
+            ->join('flacons as f', 'f.id', '=', 'pu.flacon_id')
+            ->select(
+                'p.id as produit_id',
+                'p.nom as produit_nom',
+                'p.statut',
+                'f.id as flacon_id',
+                'f.contenance_ml',
+                'pu.id as prix_id',
+                'pu.reference',
+                'pu.categorie'
+            )
+            ->get();
+
+        $ecarts = collect();
+
+        foreach ($associations->groupBy(fn ($row) => $row->produit_id.'-'.$row->flacon_id) as $rows) {
+            $categories = $rows->pluck('categorie')->unique();
+
+            if ($categories->count() >= 2) {
+                continue;
+            }
+
+            $present = $rows->first();
+            $manquante = $present->categorie === self::CATEGORIE_EN_GROS
+                ? self::CATEGORIE_DETAIL
+                : self::CATEGORIE_EN_GROS;
+
+            $ecarts->push((object) [
+                'produit_id' => (int) $present->produit_id,
+                'produit_nom' => Produit::formatNomParfum((string) $present->produit_nom),
+                'statut' => (string) $present->statut,
+                'flacon_id' => (int) $present->flacon_id,
+                'contenance_ml' => (int) $present->contenance_ml,
+                'categorie_presente' => (string) $present->categorie,
+                'categorie_manquante' => $manquante,
+                'prix_id' => (int) $present->prix_id,
+                'reference' => (string) $present->reference,
+            ]);
+        }
+
+        return $ecarts
+            ->sortBy(function ($ecart) {
+                $priorite = $ecart->statut === 'actif' ? '1' : '0';
+
+                return $priorite.'|'.mb_strtolower($ecart->produit_nom).'|'.str_pad((string) $ecart->contenance_ml, 4, '0', STR_PAD_LEFT);
+            })
+            ->values();
     }
 }

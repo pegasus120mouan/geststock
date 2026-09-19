@@ -36,6 +36,13 @@
       </div>
     @endif
 
+    @if ($prixUnitaire->produits->contains(fn ($produit) => ! $produit->isActif()))
+      <div class="alert alert-warning">
+        Un ou plusieurs parfums associés sont <strong>inactifs</strong>. Ils restent comptés dans le total, mais n’apparaissent plus dans la liste d’association.
+        <a href="{{ route('prix-unitaires.index') }}#ecarts-tarifs" class="alert-link">Voir les écarts de tarification</a>
+      </div>
+    @endif
+
     <div class="row g-4">
       <div class="col-lg-5">
         <div class="card">
@@ -109,7 +116,7 @@
               </thead>
               <tbody>
                 @forelse ($prixUnitaire->produits as $produit)
-                  <tr>
+                  <tr class="{{ $produit->isActif() ? '' : 'table-warning' }}">
                     <td>
                       <a href="{{ route('produits.show', $produit) }}" class="fw-medium text-heading text-decoration-none">
                         {{ $produit->nom }}
@@ -120,6 +127,9 @@
                       <span class="badge {{ $produit->isActif() ? 'bg-label-success' : 'bg-label-secondary' }}">
                         {{ ucfirst($produit->statut) }}
                       </span>
+                      @unless ($produit->isActif())
+                        <div class="small text-warning mt-1">Compté dans le total, mais masqué à l’association.</div>
+                      @endunless
                     </td>
                     <td class="text-end">
                       <form method="POST" action="{{ route('prix-unitaires.produits.detach', [$prixUnitaire, $produit]) }}" class="d-inline">

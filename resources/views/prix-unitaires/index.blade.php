@@ -31,6 +31,17 @@
       </div>
     @endif
 
+    @if ($errors->any())
+      <div class="alert alert-danger alert-dismissible fade show">
+        {{ $errors->first() }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    @endif
+
+    @if ($ecarts->isNotEmpty())
+      @include('prix-unitaires._ecarts')
+    @endif
+
     <form method="GET" action="{{ route('prix-unitaires.index') }}" class="card mb-4">
       <div class="card-body">
         <div class="row g-3 align-items-end">

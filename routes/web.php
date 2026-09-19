@@ -45,6 +45,7 @@ Route::middleware(['auth', 'module'])->group(function () {
 
     Route::get('/prix-unitaires', [PrixUnitaireController::class, 'index'])->name('prix-unitaires.index');
     Route::post('/prix-unitaires', [PrixUnitaireController::class, 'store'])->name('prix-unitaires.store');
+    Route::delete('/prix-unitaires/parfums/{produit}', [PrixUnitaireController::class, 'retirerParfumCategorie'])->name('prix-unitaires.produits.retirer-categorie');
     Route::get('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'show'])->name('prix-unitaires.show');
     Route::put('/prix-unitaires/{prixUnitaire}', [PrixUnitaireController::class, 'update'])->name('prix-unitaires.update');
     Route::post('/prix-unitaires/{prixUnitaire}/produits', [PrixUnitaireController::class, 'attachProduit'])->name('prix-unitaires.produits.attach');

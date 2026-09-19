@@ -37,6 +37,7 @@ class PrixUnitaireController extends Controller
         return view('prix-unitaires.index', [
             'prixEnGros' => $prixEnGros,
             'prixDetail' => $prixDetail,
+            'ecarts' => PrixUnitaire::ecartsParfum(),
             'flacons' => Flacon::query()->actif()->orderBy('contenance_ml')->get(['id', 'nom', 'contenance_ml']),
             'categories' => PrixUnitaire::categories(),
             'produits' => Produit::query()->where('statut', 'actif')->orderBy('nom')->get(['id', 'nom']),
@@ -165,9 +166,29 @@ class PrixUnitaireController extends Controller
     {
         $prixUnitaire->produits()->detach($produit->id);
 
+        return back()->with('success', 'Parfum retiré de ce prix unitaire.');
+    }
+
+    public function retirerParfumCategorie(Request $request, Produit $produit)
+    {
+        $validated = $request->validate([
+            'categorie' => ['required', Rule::in(array_keys(PrixUnitaire::categories()))],
+        ]);
+
+        $prix = PrixUnitaire::query()
+            ->where('categorie', $validated['categorie'])
+            ->whereHas('produits', fn ($q) => $q->where('produits.id', $produit->id))
+            ->get();
+
+        foreach ($prix as $prixUnitaire) {
+            $prixUnitaire->produits()->detach($produit->id);
+        }
+
+        $label = PrixUnitaire::categories()[$validated['categorie']] ?? $validated['categorie'];
+
         return redirect()
-            ->route('prix-unitaires.show', $prixUnitaire)
-            ->with('success', 'Parfum retiré de ce prix unitaire.');
+            ->route('prix-unitaires.index')
+            ->with('success', $produit->nom.' a été retiré des tarifs '.$label.'.');
     }
 
     public function destroy(PrixUnitaire $prixUnitaire)
