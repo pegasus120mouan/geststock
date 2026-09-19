@@ -301,6 +301,15 @@ class CommandeController extends Controller
     private function preparerLignes(array $lignes, ?int $editId = null)
     {
         $lignesPreparees = [];
+        $erreurs = [];
+        $produits = Produit::query()
+            ->whereIn('id', collect($lignes)->pluck('produit_id')->unique()->filter())
+            ->get()
+            ->keyBy('id');
+        $flacons = Flacon::query()
+            ->whereIn('id', collect($lignes)->pluck('flacon_id')->unique()->filter())
+            ->get()
+            ->keyBy('id');
 
         foreach ($lignes as $index => $ligne) {
             $tarif = PrixUnitaire::trouver(
@@ -310,17 +319,19 @@ class CommandeController extends Controller
             );
 
             if (! $tarif) {
-                $label = $ligne['categorie'] === PrixUnitaire::CATEGORIE_EN_GROS ? 'en gros' : 'détail';
-                $params = $editId
-                    ? ['edit' => $editId]
-                    : ['create' => 1];
+                $produit = $produits->get((int) $ligne['produit_id']);
+                $flacon = $flacons->get((int) $ligne['flacon_id']);
+                $parfum = $produit?->nom ?: 'inconnu';
+                $contenance = $flacon
+                    ? ((int) $flacon->contenance_ml).' ml'
+                    : 'inconnue';
+                $categoriePrix = $ligne['categorie'] === PrixUnitaire::CATEGORIE_EN_GROS
+                    ? 'gros'
+                    : 'détail';
 
-                return redirect()
-                    ->route('commandes.index', $params)
-                    ->withInput()
-                    ->withErrors([
-                        "lignes.$index.produit_id" => "Aucun prix {$label} pour cette ligne (parfum + contenance).",
-                    ]);
+                $erreurs["lignes.$index.produit_id"] = "Parfum : {$parfum}, contenance : {$contenance}, prix {$categoriePrix} manquant.";
+
+                continue;
             }
 
             $prix = (float) $tarif->prix;
@@ -334,6 +345,17 @@ class CommandeController extends Controller
                 'prix_unitaire' => $prix,
                 'total' => round($prix * $qte, 2),
             ];
+        }
+
+        if ($erreurs !== []) {
+            $params = $editId
+                ? ['edit' => $editId]
+                : ['create' => 1];
+
+            return redirect()
+                ->route('commandes.index', $params)
+                ->withInput()
+                ->withErrors($erreurs);
         }
 
         return $lignesPreparees;
