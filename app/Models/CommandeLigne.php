@@ -12,12 +12,15 @@ class CommandeLigne extends Model
 
     protected $table = 'commande_lignes';
 
+    public const CATEGORIE_COCKTAIL = 'cocktail';
+
     protected $fillable = [
         'commande_id',
         'produit_id',
         'flacon_id',
         'categorie',
         'quantite',
+        'quantite_ml',
         'prix_unitaire',
         'total',
     ];
@@ -26,6 +29,7 @@ class CommandeLigne extends Model
     {
         return [
             'quantite' => 'integer',
+            'quantite_ml' => 'decimal:2',
             'prix_unitaire' => 'decimal:2',
             'total' => 'decimal:2',
         ];
@@ -51,8 +55,24 @@ class CommandeLigne extends Model
         return $this->categorie === PrixUnitaire::CATEGORIE_EN_GROS;
     }
 
+    public function isCocktail(): bool
+    {
+        return $this->quantite_ml !== null
+            || $this->categorie === self::CATEGORIE_COCKTAIL;
+    }
+
     public function categorieLabel(): string
     {
+        if ($this->isCocktail()) {
+            $prix = $this->categorie === PrixUnitaire::CATEGORIE_EN_GROS
+                ? 'En gros'
+                : ($this->categorie === self::CATEGORIE_COCKTAIL ? 'Cocktail' : 'Détail');
+
+            return $this->categorie === self::CATEGORIE_COCKTAIL
+                ? 'Cocktail'
+                : 'Cocktail · '.$prix;
+        }
+
         return match ($this->categorie) {
             PrixUnitaire::CATEGORIE_EN_GROS => 'En gros',
             default => 'Détail',
@@ -61,6 +81,10 @@ class CommandeLigne extends Model
 
     public function volumeMl(): float
     {
+        if ($this->quantite_ml !== null) {
+            return round((float) $this->quantite_ml * (int) $this->quantite, 2);
+        }
+
         $contenance = (int) ($this->flacon?->contenance_ml ?? 0);
 
         return round($contenance * (int) $this->quantite, 2);

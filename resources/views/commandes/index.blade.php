@@ -6,12 +6,24 @@
 @php
   $fmt = fn ($n) => number_format((float) $n, 0, ',', ' ');
   $openSection = request('section', 'en_gros');
-  if (! in_array($openSection, ['en_gros', 'detail'], true)) {
+  if (! in_array($openSection, ['en_gros', 'detail', 'cocktail'], true)) {
     $openSection = 'en_gros';
   }
   $editId = old('_edit_id', request('edit'));
-  $oldLignes = old('lignes', [['categorie' => $openSection, 'produit_id' => '', 'flacon_id' => '', 'quantite' => 1]]);
   $produitsById = $produits->keyBy('id');
+  $createLignesNormales = old('lignes', [[
+    'categorie' => $openSection === 'en_gros' ? 'en_gros' : 'detail',
+    'produit_id' => '',
+    'flacon_id' => '',
+    'quantite' => 1,
+  ]]);
+  $createGroupesCocktail = old('groupes_cocktail', [[
+    'categorie' => $openSection === 'en_gros' ? 'en_gros' : 'detail',
+    'flacon_id' => '',
+    'quantite' => 1,
+    'cocktail_id' => '',
+    'parfums' => [],
+  ]]);
 @endphp
 
 <div class="content-wrapper">
@@ -19,7 +31,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div>
         <h4 class="mb-1">Liste des commandes</h4>
-        <p class="mb-0 text-muted">Une commande peut regrouper plusieurs parfums (gros et/ou détail)</p>
+        <p class="mb-0 text-muted">Une commande peut regrouper des parfums (gros/détail) et des cocktails (gros/détail)</p>
       </div>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNouvelleCommande">
         <i class="bx bx-plus me-1"></i>Ajouter une commande
@@ -78,7 +90,7 @@
     </form>
 
     <div class="row g-3 mb-4">
-      <div class="col-md-6">
+      <div class="col-md-4">
         <button
           type="button"
           class="card w-100 text-start border-0 shadow-none commande-section-card"
@@ -95,7 +107,7 @@
           </div>
         </button>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-4">
         <button
           type="button"
           class="card w-100 text-start border-0 shadow-none commande-section-card"
@@ -108,6 +120,23 @@
             </div>
             <div class="{{ $openSection === 'detail' ? 'text-white' : 'text-primary' }}" style="font-size: 2rem; font-weight: 700; line-height: 1;">
               {{ $commandesDetail->count() }}
+            </div>
+          </div>
+        </button>
+      </div>
+      <div class="col-md-4">
+        <button
+          type="button"
+          class="card w-100 text-start border-0 shadow-none commande-section-card"
+          data-section="cocktail"
+          style="{{ $openSection === 'cocktail' ? 'background: linear-gradient(135deg, #ff9f43, #ee8133);' : 'background: #fff4e6;' }}">
+          <div class="card-body d-flex justify-content-between align-items-center py-4">
+            <div>
+              <div class="text-uppercase small fw-semibold mb-1 {{ $openSection === 'cocktail' ? 'text-white' : 'text-warning' }}" style="opacity: .9;">Contient du</div>
+              <h4 class="mb-0 {{ $openSection === 'cocktail' ? 'text-white' : 'text-heading' }}">Cocktail</h4>
+            </div>
+            <div class="{{ $openSection === 'cocktail' ? 'text-white' : 'text-warning' }}" style="font-size: 2rem; font-weight: 700; line-height: 1;">
+              {{ $commandesCocktail->count() }}
             </div>
           </div>
         </button>
@@ -135,6 +164,18 @@
         'fmt' => $fmt,
         'section' => 'detail',
         'emptyMessage' => 'Aucune commande avec des lignes en détail.',
+      ])
+    </div>
+
+    <div class="card" id="panelCommandesCocktail" @if ($openSection !== 'cocktail') style="display: none;" @endif>
+      <div class="card-header">
+        <h5 class="mb-0">Commandes avec cocktail</h5>
+      </div>
+      @include('commandes._table', [
+        'commandes' => $commandesCocktail,
+        'fmt' => $fmt,
+        'section' => 'cocktail',
+        'emptyMessage' => 'Aucune commande cocktail.',
       ])
     </div>
 
@@ -225,80 +266,13 @@
                 </div>
               </div>
 
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0">Articles (parfum + catégorie + quantité)</h6>
-                <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddLigneCommande">
-                  <i class="bx bx-plus me-1"></i>Ajouter un parfum
-                </button>
-              </div>
-
-              <div class="table-responsive">
-                <table class="table" id="tableLignesCommande">
-                  <thead>
-                    <tr>
-                      <th style="min-width: 140px;">Catégorie <span class="text-danger">*</span></th>
-                      <th style="min-width: 220px;">Parfum <span class="text-danger">*</span></th>
-                      <th style="min-width: 140px;">Contenance <span class="text-danger">*</span></th>
-                      <th style="min-width: 100px;">Qté <span class="text-danger">*</span></th>
-                      <th style="width: 60px;"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @foreach ($oldLignes as $index => $ligne)
-                      <tr class="ligne-commande">
-                        <td>
-                          <select name="lignes[{{ $index }}][categorie]" class="form-select" required>
-                            <option value="en_gros" @selected(($ligne['categorie'] ?? $openSection) === 'en_gros')>En gros</option>
-                            <option value="detail" @selected(($ligne['categorie'] ?? $openSection) === 'detail')>Détail</option>
-                          </select>
-                        </td>
-                        <td>
-                          @php
-                            $pid = $ligne['produit_id'] ?? '';
-                            $pnom = $pid !== '' ? ($produitsById->get($pid)?->nom ?? '') : '';
-                          @endphp
-                          <div class="produit-autocomplete position-relative">
-                            <input type="hidden" name="lignes[{{ $index }}][produit_id]" class="produit-id-input" value="{{ $pid }}" required>
-                            <input
-                              type="text"
-                              class="form-control produit-search-input"
-                              value="{{ $pnom }}"
-                              placeholder="Taper le nom du parfum..."
-                              autocomplete="off"
-                              required />
-                            <div class="produit-suggestions list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 1080; max-height: 220px; overflow-y: auto;"></div>
-                          </div>
-                        </td>
-                        <td>
-                          <select name="lignes[{{ $index }}][flacon_id]" class="form-select" required>
-                            <option value="">Sélectionner</option>
-                            @foreach ($flacons as $flacon)
-                              <option value="{{ $flacon->id }}" @selected((string) ($ligne['flacon_id'] ?? '') === (string) $flacon->id)>
-                                {{ $flacon->label() }}
-                              </option>
-                            @endforeach
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            name="lignes[{{ $index }}][quantite]"
-                            class="form-control"
-                            min="1"
-                            step="1"
-                            value="{{ $ligne['quantite'] ?? 1 }}"
-                            required />
-                        </td>
-                        <td class="text-end">
-                          <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne-commande" title="Retirer">
-                            <i class="bx bx-trash"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    @endforeach
-                  </tbody>
-                </table>
-              </div>
+              @include('commandes._form_articles', [
+                'formKey' => 'create',
+                'tableNormaleId' => 'tableLignesCommande',
+                'tableCocktailId' => 'tableLignesCocktailCreate',
+                'lignesNormales' => $createLignesNormales,
+                'groupesCocktail' => $createGroupesCocktail,
+              ])
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
@@ -311,16 +285,46 @@
     @foreach ($allCommandes as $commande)
       @php
         $isThisEdit = (string) $editId === (string) $commande->id;
-        $editRows = $isThisEdit && is_array(old('lignes'))
+        $lignesNormalesCommande = $commande->lignes->filter(fn ($l) => $l->quantite_ml === null);
+        $groupesDepuisCommande = $commande->lignes
+          ->filter(fn ($l) => $l->quantite_ml !== null)
+          ->groupBy(fn ($l) => $l->flacon_id.'|'.$l->categorie.'|'.$l->quantite)
+          ->map(function ($lignes) use ($commande) {
+            $first = $lignes->first();
+            return [
+              'categorie' => $first->categorie === 'cocktail' ? 'detail' : $first->categorie,
+              'flacon_id' => $first->flacon_id,
+              'quantite' => $first->quantite,
+              'cocktail_id' => $commande->cocktail_id,
+              'parfums' => $lignes->map(fn ($l) => [
+                'produit_id' => $l->produit_id,
+                'quantite_ml' => $l->quantite_ml,
+              ])->values()->all(),
+            ];
+          })
+          ->values()
+          ->all();
+        $editLignesNormales = $isThisEdit && is_array(old('lignes'))
           ? old('lignes')
-          : ($commande->lignes->isNotEmpty()
-            ? $commande->lignes->map(fn ($l) => [
+          : ($lignesNormalesCommande->isNotEmpty()
+            ? $lignesNormalesCommande->map(fn ($l) => [
               'categorie' => $l->categorie,
               'produit_id' => $l->produit_id,
               'flacon_id' => $l->flacon_id,
               'quantite' => $l->quantite,
-            ])->all()
+            ])->values()->all()
             : [['categorie' => 'detail', 'produit_id' => '', 'flacon_id' => '', 'quantite' => 1]]);
+        $editGroupesCocktail = $isThisEdit && is_array(old('groupes_cocktail'))
+          ? old('groupes_cocktail')
+          : ($groupesDepuisCommande !== []
+            ? $groupesDepuisCommande
+            : [[
+              'categorie' => 'detail',
+              'flacon_id' => '',
+              'quantite' => 1,
+              'cocktail_id' => '',
+              'parfums' => [],
+            ]]);
       @endphp
 
       <div class="modal fade" id="modalEditCommande{{ $commande->id }}" tabindex="-1" aria-hidden="true">
@@ -421,80 +425,13 @@
                   </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h6 class="mb-0">Articles (parfum + catégorie + quantité)</h6>
-                  <button type="button" class="btn btn-sm btn-outline-primary btn-add-ligne-edit" data-target="editLignesCommande{{ $commande->id }}">
-                    <i class="bx bx-plus me-1"></i>Ajouter un parfum
-                  </button>
-                </div>
-
-                <div class="table-responsive">
-                  <table class="table" id="editLignesCommande{{ $commande->id }}">
-                    <thead>
-                      <tr>
-                        <th style="min-width: 140px;">Catégorie <span class="text-danger">*</span></th>
-                        <th style="min-width: 220px;">Parfum <span class="text-danger">*</span></th>
-                        <th style="min-width: 140px;">Contenance <span class="text-danger">*</span></th>
-                        <th style="min-width: 100px;">Qté <span class="text-danger">*</span></th>
-                        <th style="width: 60px;"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @foreach ($editRows as $index => $ligne)
-                        <tr class="ligne-commande">
-                          <td>
-                            <select name="lignes[{{ $index }}][categorie]" class="form-select" required>
-                              <option value="en_gros" @selected(($ligne['categorie'] ?? '') === 'en_gros')>En gros</option>
-                              <option value="detail" @selected(($ligne['categorie'] ?? '') === 'detail')>Détail</option>
-                            </select>
-                          </td>
-                          <td>
-                            @php
-                              $pid = $ligne['produit_id'] ?? '';
-                              $pnom = $pid !== '' ? ($produitsById->get($pid)?->nom ?? '') : '';
-                            @endphp
-                            <div class="produit-autocomplete position-relative">
-                              <input type="hidden" name="lignes[{{ $index }}][produit_id]" class="produit-id-input" value="{{ $pid }}" required>
-                              <input
-                                type="text"
-                                class="form-control produit-search-input"
-                                value="{{ $pnom }}"
-                                placeholder="Taper le nom du parfum..."
-                                autocomplete="off"
-                                required />
-                              <div class="produit-suggestions list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 1080; max-height: 220px; overflow-y: auto;"></div>
-                            </div>
-                          </td>
-                          <td>
-                            <select name="lignes[{{ $index }}][flacon_id]" class="form-select" required>
-                              <option value="">Sélectionner</option>
-                              @foreach ($flacons as $flacon)
-                                <option value="{{ $flacon->id }}" @selected((string) ($ligne['flacon_id'] ?? '') === (string) $flacon->id)>
-                                  {{ $flacon->label() }}
-                                </option>
-                              @endforeach
-                            </select>
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              name="lignes[{{ $index }}][quantite]"
-                              class="form-control"
-                              min="1"
-                              step="1"
-                              value="{{ $ligne['quantite'] ?? 1 }}"
-                              required />
-                          </td>
-                          <td class="text-end">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne-commande" title="Retirer">
-                              <i class="bx bx-trash"></i>
-                            </button>
-                          </td>
-                        </tr>
-                      @endforeach
-                    </tbody>
-                  </table>
-                </div>
+                @include('commandes._form_articles', [
+                  'formKey' => $commande->id,
+                  'tableNormaleId' => 'editLignesCommande'.$commande->id,
+                  'tableCocktailId' => 'editLignesCocktail'.$commande->id,
+                  'lignesNormales' => $editLignesNormales,
+                  'groupesCocktail' => $editGroupesCocktail,
+                ])
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
@@ -530,7 +467,7 @@
           <select name="lignes[__INDEX__][flacon_id]" class="form-select" required>
             <option value="">Sélectionner</option>
             @foreach ($flacons as $flacon)
-              <option value="{{ $flacon->id }}">{{ $flacon->label() }}</option>
+              <option value="{{ $flacon->id }}" data-ml="{{ $flacon->contenance_ml }}">{{ $flacon->label() }}</option>
             @endforeach
           </select>
         </td>
@@ -544,6 +481,133 @@
         </td>
       </tr>
     </template>
+
+    <template id="tplLigneCocktailCommande">
+      <tr class="ligne-cocktail-commande">
+        <td>
+          <div class="produit-autocomplete position-relative">
+            <input type="hidden" name="groupes_cocktail[__G__][parfums][__INDEX__][produit_id]" class="produit-id-input" value="">
+            <input
+              type="text"
+              class="form-control produit-search-input"
+              value=""
+              placeholder="Taper le nom du parfum..."
+              autocomplete="off" />
+            <div class="produit-suggestions list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 1080; max-height: 220px; overflow-y: auto;"></div>
+          </div>
+        </td>
+        <td>
+          <input type="number" name="groupes_cocktail[__G__][parfums][__INDEX__][quantite_ml]" class="form-control cocktail-ml-input" min="0.01" step="0.01" placeholder="Ex: 5" />
+        </td>
+        <td class="text-end">
+          <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne-cocktail" title="Retirer">
+            <i class="bx bx-trash"></i>
+          </button>
+        </td>
+      </tr>
+    </template>
+
+    <template id="tplLigneCocktailCreateModal">
+      <tr class="ligne-cocktail-create">
+        <td>
+          <div class="produit-autocomplete position-relative">
+            <input type="hidden" name="lignes[__INDEX__][produit_id]" class="produit-id-input" value="">
+            <input
+              type="text"
+              class="form-control produit-search-input"
+              value=""
+              placeholder="Taper le nom du parfum..."
+              autocomplete="off" />
+            <div class="produit-suggestions list-group position-absolute start-0 end-0 shadow-sm d-none" style="z-index: 1120; max-height: 220px; overflow-y: auto;"></div>
+          </div>
+        </td>
+        <td class="text-end">
+          <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne-create-cocktail" title="Retirer">
+            <i class="bx bx-trash"></i>
+          </button>
+        </td>
+      </tr>
+    </template>
+
+    <div class="modal fade" id="modalCreerCocktailCommande" tabindex="-1" aria-hidden="true" data-store-url="{{ route('commandes.cocktails.store') }}">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Nouveau cocktail</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div id="creerCocktailCommandeErrors" class="alert alert-danger d-none"></div>
+            <div class="mb-3">
+              <label class="form-label">Nom du cocktail <span class="text-danger">*</span></label>
+              <input type="text" id="creerCocktailNom" class="form-control" placeholder="Ex: Mix été" />
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Parfums qui le composent</h6>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddLigneCreateCocktail">
+                <i class="bx bx-plus me-1"></i>Ajouter un parfum
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table" id="tableCreerCocktailCommande">
+                <thead>
+                  <tr>
+                    <th>Parfum <span class="text-danger">*</span></th>
+                    <th style="width: 60px;"></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+            <button type="button" class="btn btn-primary" id="btnSaveCreerCocktailCommande">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      .groupe-cocktail.cocktail-locked .btn-add-ligne-cocktail,
+      .groupe-cocktail.cocktail-locked .btn-remove-ligne-cocktail {
+        display: none;
+      }
+      .groupe-cocktail.cocktail-locked .produit-search-input {
+        background-color: #f5f5f9;
+        pointer-events: none;
+      }
+      .cocktail-nom-field {
+        position: relative;
+        z-index: 20;
+      }
+      .cocktail-autocomplete {
+        z-index: 21;
+      }
+      .cocktail-suggestions {
+        display: none;
+        z-index: 30;
+        top: 100%;
+        margin-top: 2px;
+        max-height: 240px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1px solid rgba(67, 89, 113, .2);
+        border-radius: .375rem;
+      }
+      .cocktail-suggestions:not(.d-none) {
+        display: block;
+      }
+      .cocktail-suggestions .list-group-item {
+        background: #fff;
+      }
+      .cocktail-create-item {
+        font-weight: 600;
+      }
+      #modalCreerCocktailCommande {
+        z-index: 1100;
+      }
+    </style>
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
@@ -666,22 +730,410 @@
 
         bindProduitAutocomplete(document);
 
-        document.querySelectorAll('#modalNouvelleCommande form, form.modal-content').forEach(function (form) {
+        var cocktailsCatalog = @json($cocktailsCatalog ?? []);
+
+        var tplNormale = document.getElementById('tplLigneCommande').innerHTML;
+        var tplCocktail = document.getElementById('tplLigneCocktailCommande').innerHTML;
+        var tplCocktailCreate = document.getElementById('tplLigneCocktailCreateModal').innerHTML;
+        var modalCreerEl = document.getElementById('modalCreerCocktailCommande');
+        var modalCreer = modalCreerEl && window.bootstrap ? new bootstrap.Modal(modalCreerEl) : null;
+        var cocktailGroupeCible = null;
+
+        function formatMl(value) {
+          var n = Number(value);
+          if (!isFinite(n)) return '0';
+          return String(Math.round(n * 100) / 100).replace('.', ',');
+        }
+
+        function cocktailEstRempli(groupe) {
+          var idInput = groupe.querySelector('.cocktail-id-input');
+          if (idInput && String(idInput.value || '').trim() !== '') return true;
+          return Array.from(groupe.querySelectorAll('.cocktail-composition .produit-id-input')).some(function (input) {
+            return String(input.value || '').trim() !== '';
+          });
+        }
+
+        function showCocktailComposition(groupe, show) {
+          var empty = groupe.querySelector('.cocktail-composition-empty');
+          var composition = groupe.querySelector('.cocktail-composition');
+          if (empty) empty.classList.toggle('d-none', !!show);
+          if (composition) composition.classList.toggle('d-none', !show);
+        }
+
+        function syncCocktailVolume(groupe) {
+          var recap = groupe.querySelector('.cocktail-volume-recap');
+          if (!recap) return;
+          var flaconSelect = groupe.querySelector('.cocktail-flacon-select');
+          var opt = flaconSelect ? flaconSelect.options[flaconSelect.selectedIndex] : null;
+          var max = opt ? Number(opt.getAttribute('data-ml') || 0) : 0;
+          var used = 0;
+          groupe.querySelectorAll('.cocktail-ml-input').forEach(function (input) {
+            used += Number(input.value || 0);
+          });
+          used = Math.round(used * 100) / 100;
+          var usedEl = recap.querySelector('.cocktail-volume-used');
+          var maxEl = recap.querySelector('.cocktail-volume-max');
+          var restEl = recap.querySelector('.cocktail-volume-restant');
+          if (usedEl) usedEl.textContent = formatMl(used);
+          if (maxEl) maxEl.textContent = max > 0 ? formatMl(max) : '—';
+          recap.classList.remove('alert-info', 'alert-danger', 'alert-success');
+          if (!cocktailEstRempli(groupe)) {
+            recap.classList.add('alert-info');
+            if (restEl) restEl.textContent = 'Optionnel si la commande n’a que des articles normaux.';
+            recap.dataset.over = '0';
+            return;
+          }
+          if (!(max > 0)) {
+            recap.classList.add('alert-info');
+            if (restEl) restEl.textContent = 'Choisissez une contenance.';
+            recap.dataset.over = '0';
+            return;
+          }
+          var diff = Math.round((used - max) * 100) / 100;
+          if (Math.abs(diff) < 0.01) {
+            recap.classList.add('alert-success');
+            if (restEl) restEl.textContent = 'Volume exact.';
+            recap.dataset.over = '0';
+          } else if (diff > 0) {
+            recap.classList.add('alert-danger');
+            if (restEl) restEl.textContent = 'Dépassement de ' + formatMl(diff) + ' ml. Le volume doit être exactement ' + formatMl(max) + ' ml.';
+            recap.dataset.over = '1';
+          } else {
+            recap.classList.add('alert-danger');
+            if (restEl) restEl.textContent = 'Il manque ' + formatMl(-diff) + ' ml. Le volume doit être exactement ' + formatMl(max) + ' ml.';
+            recap.dataset.over = '1';
+          }
+        }
+
+        function upsertCocktailCatalog(cocktail) {
+          var idx = cocktailsCatalog.findIndex(function (c) { return String(c.id) === String(cocktail.id); });
+          if (idx >= 0) cocktailsCatalog[idx] = cocktail;
+          else cocktailsCatalog.push(cocktail);
+        }
+
+        function findCocktailByNom(nom) {
+          var q = normalizeText(nom);
+          if (!q) return null;
+          return cocktailsCatalog.find(function (c) { return normalizeText(c.nom) === q; }) || null;
+        }
+
+        function applyCocktailToGroupe(groupe, cocktail) {
+          if (!groupe || !cocktail) return;
+          var idInput = groupe.querySelector('.cocktail-id-input');
+          var searchInput = groupe.querySelector('.cocktail-search-input');
+          var tbody = groupe.querySelector('.cocktail-composition tbody');
+          if (idInput) idInput.value = String(cocktail.id);
+          if (searchInput) {
+            searchInput.value = cocktail.nom;
+            searchInput.classList.remove('is-invalid');
+          }
+          if (!tbody) return;
+          var gIndex = groupe.getAttribute('data-index') || '0';
+          tbody.innerHTML = '';
+          (cocktail.lignes || []).forEach(function (ligne, index) {
+            tbody.insertAdjacentHTML('beforeend', tplCocktail.replaceAll('__G__', gIndex).replaceAll('__INDEX__', String(index)));
+            var row = tbody.querySelectorAll('.ligne-cocktail-commande')[index];
+            if (!row) return;
+            var pid = row.querySelector('.produit-id-input');
+            var psearch = row.querySelector('.produit-search-input');
+            var mlInput = row.querySelector('.cocktail-ml-input');
+            if (pid) pid.value = String(ligne.produit_id);
+            if (psearch) {
+              psearch.value = ligne.nom || '';
+              psearch.readOnly = true;
+            }
+            if (mlInput) mlInput.value = '';
+          });
+          groupe.classList.add('cocktail-locked');
+          showCocktailComposition(groupe, true);
+          bindProduitAutocomplete(tbody);
+          syncCocktailVolume(groupe);
+        }
+
+        function clearCocktailComposition(groupe) {
+          var tbody = groupe.querySelector('.cocktail-composition tbody');
+          if (tbody) tbody.innerHTML = '';
+          groupe.classList.remove('cocktail-locked');
+          showCocktailComposition(groupe, false);
+          syncCocktailVolume(groupe);
+        }
+
+        function resetCreateCocktailModal(nom) {
+          var errors = document.getElementById('creerCocktailCommandeErrors');
+          var nomInput = document.getElementById('creerCocktailNom');
+          var tbody = document.querySelector('#tableCreerCocktailCommande tbody');
+          if (errors) {
+            errors.classList.add('d-none');
+            errors.innerHTML = '';
+          }
+          if (nomInput) nomInput.value = nom || '';
+          if (!tbody) return;
+          tbody.innerHTML = '';
+          tbody.insertAdjacentHTML('beforeend', tplCocktailCreate.replaceAll('__INDEX__', '0'));
+          tbody.insertAdjacentHTML('beforeend', tplCocktailCreate.replaceAll('__INDEX__', '1'));
+          tbody.querySelectorAll('.produit-autocomplete').forEach(function (wrap) {
+            delete wrap.dataset.bound;
+          });
+          bindProduitAutocomplete(tbody);
+        }
+
+        function openCreateCocktailModal(groupe, nom) {
+          cocktailGroupeCible = groupe;
+          resetCreateCocktailModal(nom);
+          if (modalCreerEl) {
+            modalCreerEl.addEventListener('shown.bs.modal', function onShown() {
+              var backdrops = document.querySelectorAll('.modal-backdrop');
+              if (backdrops.length) backdrops[backdrops.length - 1].style.zIndex = '1095';
+              var nomInput = document.getElementById('creerCocktailNom');
+              if (nomInput) nomInput.focus();
+              modalCreerEl.removeEventListener('shown.bs.modal', onShown);
+            });
+          }
+          if (modalCreer) modalCreer.show();
+        }
+
+        function collectCreateCocktailLignes() {
+          var lignes = [];
+          document.querySelectorAll('#tableCreerCocktailCommande .ligne-cocktail-create').forEach(function (row) {
+            var idInput = row.querySelector('.produit-id-input');
+            if (!idInput || !idInput.value) return;
+            lignes.push({ produit_id: Number(idInput.value) });
+          });
+          return lignes;
+        }
+
+        function bindCocktailAutocomplete(root) {
+          (root || document).querySelectorAll('.cocktail-autocomplete').forEach(function (wrap) {
+            if (wrap.dataset.bound === '1') return;
+            wrap.dataset.bound = '1';
+
+            var searchInput = wrap.querySelector('.cocktail-search-input');
+            var idInput = wrap.querySelector('.cocktail-id-input');
+            var box = wrap.querySelector('.cocktail-suggestions');
+            if (!searchInput || !idInput || !box) return;
+
+            function renderCocktailSuggestions(query) {
+              var q = normalizeText(query);
+              if (q.length < 1) {
+                hideSuggestions(box);
+                return;
+              }
+              var matches = cocktailsCatalog
+                .filter(function (c) { return normalizeText(c.nom).indexOf(q) !== -1; })
+                .slice(0, 12);
+              var exact = matches.some(function (c) { return normalizeText(c.nom) === q; });
+              var html = matches.map(function (c) {
+                return '<button type="button" class="list-group-item list-group-item-action cocktail-suggestion-item" data-id="' + escapeHtml(c.id) + '">' + escapeHtml(c.nom) + '</button>';
+              }).join('');
+              if (!exact) {
+                html += '<button type="button" class="list-group-item list-group-item-action cocktail-create-item text-primary" data-nom="' + escapeHtml(query.trim()) + '"><i class="bx bx-plus me-1"></i>Créer le cocktail « ' + escapeHtml(query.trim()) + ' »</button>';
+              }
+              if (!html) {
+                html = '<div class="list-group-item text-muted small">Aucun cocktail trouvé</div>';
+              }
+              box.innerHTML = html;
+              box.classList.remove('d-none');
+            }
+
+            searchInput.addEventListener('input', function () {
+              idInput.value = '';
+              var groupe = wrap.closest('.groupe-cocktail');
+              if (groupe) {
+                groupe.classList.remove('cocktail-locked');
+                clearCocktailComposition(groupe);
+              }
+              renderCocktailSuggestions(searchInput.value);
+            });
+
+            searchInput.addEventListener('focus', function () {
+              if (searchInput.value.trim() !== '') {
+                renderCocktailSuggestions(searchInput.value);
+              }
+            });
+
+            searchInput.addEventListener('keydown', function (e) {
+              if (e.key === 'Escape') {
+                hideSuggestions(box);
+                return;
+              }
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              var nom = searchInput.value.trim();
+              if (!nom) return;
+              var exact = findCocktailByNom(nom);
+              var groupe = wrap.closest('.groupe-cocktail');
+              hideSuggestions(box);
+              if (exact) applyCocktailToGroupe(groupe, exact);
+              else openCreateCocktailModal(groupe, nom);
+            });
+
+            box.addEventListener('mousedown', function (e) {
+              var createItem = e.target.closest('.cocktail-create-item');
+              if (createItem) {
+                e.preventDefault();
+                hideSuggestions(box);
+                openCreateCocktailModal(wrap.closest('.groupe-cocktail'), createItem.getAttribute('data-nom') || searchInput.value.trim());
+                return;
+              }
+              var item = e.target.closest('.cocktail-suggestion-item');
+              if (!item) return;
+              e.preventDefault();
+              var cocktail = cocktailsCatalog.find(function (c) { return String(c.id) === String(item.getAttribute('data-id')); });
+              hideSuggestions(box);
+              if (cocktail) applyCocktailToGroupe(wrap.closest('.groupe-cocktail'), cocktail);
+            });
+
+            searchInput.addEventListener('blur', function () {
+              setTimeout(function () {
+                hideSuggestions(box);
+                if (idInput.value || searchInput.value.trim() === '') return;
+                var exact = findCocktailByNom(searchInput.value);
+                if (exact) applyCocktailToGroupe(wrap.closest('.groupe-cocktail'), exact);
+              }, 150);
+            });
+          });
+        }
+
+        bindCocktailAutocomplete(document);
+
+        if (modalCreerEl) {
+          modalCreerEl.addEventListener('hidden.bs.modal', function () {
+            if (document.querySelector('.modal.show')) {
+              document.body.classList.add('modal-open');
+            }
+          });
+        }
+
+        function nextGroupeIndex(container) {
+          var max = -1;
+          container.querySelectorAll('.groupe-cocktail').forEach(function (groupe) {
+            var i = parseInt(groupe.getAttribute('data-index') || '0', 10);
+            if (!isNaN(i) && i > max) max = i;
+          });
+          return max + 1;
+        }
+
+        function reindexGroupeCocktail(groupe, gIndex) {
+          groupe.setAttribute('data-index', String(gIndex));
+          groupe.querySelectorAll('[name]').forEach(function (el) {
+            el.name = el.name.replace(/groupes_cocktail\[\d+\]/, 'groupes_cocktail[' + gIndex + ']');
+          });
+          var table = groupe.querySelector('.cocktail-composition table');
+          var addBtn = groupe.querySelector('.btn-add-ligne-cocktail');
+          if (table) {
+            var newId = 'tableLignesCocktailDyn' + Date.now() + '_' + gIndex;
+            table.id = newId;
+            if (addBtn) addBtn.setAttribute('data-target', newId);
+          }
+          if (addBtn) addBtn.setAttribute('data-groupe', String(gIndex));
+        }
+
+        function resetGroupeCocktail(groupe) {
+          groupe.querySelectorAll('select').forEach(function (select) {
+            if (select.options.length) select.selectedIndex = 0;
+            select.value = select.options.length ? select.options[0].value : '';
+          });
+          groupe.querySelectorAll('input[type="number"]').forEach(function (input) {
+            if ((input.name || '').indexOf('[quantite]') !== -1 && (input.name || '').indexOf('[parfums]') === -1) {
+              input.value = '1';
+            } else {
+              input.value = '';
+            }
+          });
+          var idInput = groupe.querySelector('.cocktail-id-input');
+          var searchInput = groupe.querySelector('.cocktail-search-input');
+          if (idInput) idInput.value = '';
+          if (searchInput) {
+            searchInput.value = '';
+            searchInput.classList.remove('is-invalid');
+          }
+          clearCocktailComposition(groupe);
+        }
+
+        document.querySelectorAll('form.modal-content').forEach(function (form) {
+          form.querySelectorAll('.groupe-cocktail').forEach(function (groupe) {
+            syncCocktailVolume(groupe);
+          });
+          form.addEventListener('input', function (e) {
+            if (e.target && e.target.classList.contains('cocktail-ml-input')) {
+              var groupe = e.target.closest('.groupe-cocktail');
+              if (groupe) syncCocktailVolume(groupe);
+            }
+          });
+          form.addEventListener('change', function (e) {
+            if (e.target && e.target.classList.contains('cocktail-flacon-select')) {
+              var groupeFlacon = e.target.closest('.groupe-cocktail');
+              if (groupeFlacon) syncCocktailVolume(groupeFlacon);
+            }
+          });
+
           form.addEventListener('submit', function (e) {
+            var hasNormal = false;
+            var hasCocktail = false;
             var invalid = false;
-            form.querySelectorAll('.produit-autocomplete').forEach(function (wrap) {
-              var idInput = wrap.querySelector('.produit-id-input');
-              var searchInput = wrap.querySelector('.produit-search-input');
+
+            form.querySelectorAll('.commande-mode-normale .ligne-commande').forEach(function (row) {
+              var idInput = row.querySelector('.produit-id-input');
+              var searchInput = row.querySelector('.produit-search-input');
+              var typed = searchInput && searchInput.value.trim() !== '';
+              if (!typed && (!idInput || !idInput.value)) return;
               if (idInput && !idInput.value) {
                 invalid = true;
                 if (searchInput) searchInput.classList.add('is-invalid');
-              } else if (searchInput) {
-                searchInput.classList.remove('is-invalid');
+              } else {
+                hasNormal = true;
+                if (searchInput) searchInput.classList.remove('is-invalid');
               }
             });
+
+            form.querySelectorAll('.groupe-cocktail').forEach(function (groupe) {
+              var nomInput = groupe.querySelector('.cocktail-search-input');
+              var cocktailIdInput = groupe.querySelector('.cocktail-id-input');
+              var nomTape = nomInput && nomInput.value.trim() !== '';
+              if (nomTape && (!cocktailIdInput || !cocktailIdInput.value) && !cocktailEstRempli(groupe)) {
+                invalid = true;
+                openCreateCocktailModal(groupe, nomInput.value.trim());
+                return;
+              }
+              if (!cocktailEstRempli(groupe)) return;
+              hasCocktail = true;
+              var parfums = 0;
+              groupe.querySelectorAll('.ligne-cocktail-commande').forEach(function (row) {
+                var idInput = row.querySelector('.produit-id-input');
+                var searchInput = row.querySelector('.produit-search-input');
+                var typed = searchInput && searchInput.value.trim() !== '';
+                if (!typed && (!idInput || !idInput.value)) return;
+                if (idInput && !idInput.value) {
+                  invalid = true;
+                  if (searchInput) searchInput.classList.add('is-invalid');
+                } else {
+                  parfums += 1;
+                  if (searchInput) searchInput.classList.remove('is-invalid');
+                }
+              });
+              var recap = groupe.querySelector('.cocktail-volume-recap');
+              var flaconSelect = groupe.querySelector('.cocktail-flacon-select');
+              if (!flaconSelect || !flaconSelect.value) {
+                invalid = true;
+                alert('Sélectionnez la contenance du cocktail.');
+              }
+              if (parfums < 2) {
+                invalid = true;
+                alert('Un cocktail doit associer au moins deux parfums.');
+              }
+              if (recap && recap.dataset.over === '1') {
+                invalid = true;
+                alert('Le volume total des parfums doit être exactement égal à la contenance du flacon.');
+              }
+            });
+
             if (invalid) {
               e.preventDefault();
-              alert('Sélectionnez un parfum dans la liste de suggestions pour chaque ligne.');
+              return;
+            }
+            if (!hasNormal && !hasCocktail) {
+              e.preventDefault();
+              alert('Ajoutez au moins un parfum normal ou un cocktail.');
             }
           });
         });
@@ -703,36 +1155,40 @@
         document.querySelectorAll('.commune-select').forEach(bindCommuneSelect);
 
         var sectionInput = document.querySelector('input[name="section"]');
-        var panelEnGros = document.getElementById('panelCommandesEnGros');
-        var panelDetail = document.getElementById('panelCommandesDetail');
+        var panels = {
+          en_gros: document.getElementById('panelCommandesEnGros'),
+          detail: document.getElementById('panelCommandesDetail'),
+          cocktail: document.getElementById('panelCommandesCocktail')
+        };
         var cards = document.querySelectorAll('.commande-section-card');
-        var createTbody = document.querySelector('#tableLignesCommande tbody');
-        var tpl = document.getElementById('tplLigneCommande').innerHTML;
-        var createIndex = createTbody.querySelectorAll('.ligne-commande').length;
+        var sectionStyles = {
+          en_gros: { active: 'linear-gradient(135deg, #03c3ec, #0aa2c0)', idle: '#e7f8fc', color: 'text-info' },
+          detail: { active: 'linear-gradient(135deg, #696cff, #5a5fe0)', idle: '#efefff', color: 'text-primary' },
+          cocktail: { active: 'linear-gradient(135deg, #ff9f43, #ee8133)', idle: '#fff4e6', color: 'text-warning' }
+        };
 
         function setSection(section) {
-          var isGros = section === 'en_gros';
           if (sectionInput) sectionInput.value = section;
-          if (panelEnGros) panelEnGros.style.display = isGros ? '' : 'none';
-          if (panelDetail) panelDetail.style.display = isGros ? 'none' : '';
+          Object.keys(panels).forEach(function (key) {
+            if (panels[key]) panels[key].style.display = key === section ? '' : 'none';
+          });
 
           cards.forEach(function (card) {
-            var active = card.dataset.section === section;
-            var isGrosCard = card.dataset.section === 'en_gros';
-            card.style.background = active
-              ? (isGrosCard ? 'linear-gradient(135deg, #03c3ec, #0aa2c0)' : 'linear-gradient(135deg, #696cff, #5a5fe0)')
-              : (isGrosCard ? '#e7f8fc' : '#efefff');
+            var key = card.dataset.section;
+            var style = sectionStyles[key] || sectionStyles.detail;
+            var active = key === section;
+            card.style.background = active ? style.active : style.idle;
 
             var label = card.querySelector('.text-uppercase');
             var title = card.querySelector('h4');
             var count = card.querySelector('.card-body > div:last-child');
             if (label) {
-              label.className = 'text-uppercase small fw-semibold mb-1 ' + (active ? 'text-white' : (isGrosCard ? 'text-info' : 'text-primary'));
+              label.className = 'text-uppercase small fw-semibold mb-1 ' + (active ? 'text-white' : style.color);
               label.style.opacity = '.9';
             }
             if (title) title.className = 'mb-0 ' + (active ? 'text-white' : 'text-heading');
             if (count) {
-              count.className = active ? 'text-white' : (isGrosCard ? 'text-info' : 'text-primary');
+              count.className = active ? 'text-white' : style.color;
               count.style.fontSize = '2rem';
               count.style.fontWeight = '700';
               count.style.lineHeight = '1';
@@ -746,32 +1202,174 @@
           });
         });
 
-        document.getElementById('btnAddLigneCommande').addEventListener('click', function () {
-          createTbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(createIndex)));
-          createIndex += 1;
-          bindProduitAutocomplete(createTbody);
+        document.addEventListener('click', function (e) {
+          var btnAddNormale = e.target.closest('.btn-add-ligne-normale');
+          if (btnAddNormale) {
+            var tableN = document.getElementById(btnAddNormale.getAttribute('data-target'));
+            if (!tableN) return;
+            var tbodyAddN = tableN.querySelector('tbody');
+            var indexN = tbodyAddN.querySelectorAll('.ligne-commande').length;
+            tbodyAddN.insertAdjacentHTML('beforeend', tplNormale.replaceAll('__INDEX__', String(indexN)));
+            bindProduitAutocomplete(tbodyAddN);
+            return;
+          }
+
+          var btnAddCocktail = e.target.closest('.btn-add-ligne-cocktail');
+          if (btnAddCocktail) {
+            var tableC = document.getElementById(btnAddCocktail.getAttribute('data-target'));
+            if (!tableC) return;
+            var tbodyAddC = tableC.querySelector('tbody');
+            var groupeAdd = btnAddCocktail.closest('.groupe-cocktail');
+            var gIndexAdd = (groupeAdd && groupeAdd.getAttribute('data-index')) || btnAddCocktail.getAttribute('data-groupe') || '0';
+            var indexC = tbodyAddC.querySelectorAll('.ligne-cocktail-commande').length;
+            tbodyAddC.insertAdjacentHTML('beforeend', tplCocktail.replaceAll('__G__', gIndexAdd).replaceAll('__INDEX__', String(indexC)));
+            bindProduitAutocomplete(tbodyAddC);
+            if (groupeAdd) syncCocktailVolume(groupeAdd);
+            return;
+          }
+
+          var btnAddGroupe = e.target.closest('.btn-add-groupe-cocktail');
+          if (btnAddGroupe) {
+            var formAdd = btnAddGroupe.closest('form');
+            var container = formAdd ? formAdd.querySelector('.groupes-cocktail') : null;
+            var source = container ? container.querySelector('.groupe-cocktail') : null;
+            if (!container || !source) return;
+            var clone = source.cloneNode(true);
+            clone.querySelectorAll('.produit-autocomplete, .cocktail-autocomplete').forEach(function (wrap) {
+              delete wrap.dataset.bound;
+            });
+            reindexGroupeCocktail(clone, nextGroupeIndex(container));
+            container.appendChild(clone);
+            resetGroupeCocktail(clone);
+            bindCocktailAutocomplete(clone);
+            return;
+          }
+
+          var btnNormale = e.target.closest('.btn-remove-ligne-commande');
+          if (btnNormale) {
+            var tbodyN = btnNormale.closest('tbody');
+            if (!tbodyN) return;
+            if (tbodyN.querySelectorAll('.ligne-commande').length <= 1) return;
+            btnNormale.closest('tr').remove();
+            return;
+          }
+
+          var btnRemoveGroupe = e.target.closest('.btn-remove-groupe-cocktail');
+          if (btnRemoveGroupe) {
+            var groupeRm = btnRemoveGroupe.closest('.groupe-cocktail');
+            var containerRm = btnRemoveGroupe.closest('.groupes-cocktail');
+            if (!groupeRm || !containerRm) return;
+            if (containerRm.querySelectorAll('.groupe-cocktail').length <= 1) {
+              resetGroupeCocktail(groupeRm);
+              return;
+            }
+            groupeRm.remove();
+            return;
+          }
+
+          var btnRemoveCreate = e.target.closest('.btn-remove-ligne-create-cocktail');
+          if (btnRemoveCreate) {
+            var tbodyCreate = btnRemoveCreate.closest('tbody');
+            if (!tbodyCreate) return;
+            if (tbodyCreate.querySelectorAll('.ligne-cocktail-create').length <= 2) return;
+            btnRemoveCreate.closest('tr').remove();
+            return;
+          }
+
+          var btnCocktail = e.target.closest('.btn-remove-ligne-cocktail');
+          if (!btnCocktail) return;
+          var tbodyC = btnCocktail.closest('tbody');
+          if (!tbodyC) return;
+          if (tbodyC.querySelectorAll('.ligne-cocktail-commande').length <= 2) return;
+          var groupe = btnCocktail.closest('.groupe-cocktail');
+          btnCocktail.closest('tr').remove();
+          if (groupe) syncCocktailVolume(groupe);
         });
 
-        document.querySelectorAll('.btn-add-ligne-edit').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            var table = document.getElementById(btn.getAttribute('data-target'));
-            if (!table) return;
-            var tbody = table.querySelector('tbody');
-            var index = tbody.querySelectorAll('.ligne-commande').length;
-            tbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(index)));
+        var csrfToken = document.querySelector('meta[name="csrf-token"]');
+        csrfToken = csrfToken ? csrfToken.getAttribute('content') : '';
+
+        var btnAddCreateRow = document.getElementById('btnAddLigneCreateCocktail');
+        if (btnAddCreateRow) {
+          btnAddCreateRow.addEventListener('click', function () {
+            var tbody = document.querySelector('#tableCreerCocktailCommande tbody');
+            if (!tbody) return;
+            var index = tbody.querySelectorAll('.ligne-cocktail-create').length;
+            tbody.insertAdjacentHTML('beforeend', tplCocktailCreate.replaceAll('__INDEX__', String(index)));
             bindProduitAutocomplete(tbody);
           });
-        });
+        }
 
-        document.addEventListener('click', function (e) {
-          var btn = e.target.closest('.btn-remove-ligne-commande');
-          if (!btn) return;
-          var tbody = btn.closest('tbody');
-          if (!tbody) return;
-          var rows = tbody.querySelectorAll('.ligne-commande');
-          if (rows.length <= 1) return;
-          btn.closest('tr').remove();
-        });
+        var btnSaveCreate = document.getElementById('btnSaveCreerCocktailCommande');
+        if (btnSaveCreate) {
+          btnSaveCreate.addEventListener('click', function () {
+            var errorsBox = document.getElementById('creerCocktailCommandeErrors');
+            var nomInput = document.getElementById('creerCocktailNom');
+            var nom = nomInput ? nomInput.value.trim() : '';
+            var lignes = collectCreateCocktailLignes();
+            var messages = [];
+            if (!nom) messages.push('Indiquez le nom du cocktail.');
+            if (lignes.length < 2) messages.push('Ajoutez au moins deux parfums.');
+            var unique = {};
+            lignes.forEach(function (l) { unique[l.produit_id] = true; });
+            if (Object.keys(unique).length < 2) messages.push('Un cocktail doit associer au moins deux parfums différents.');
+            if (messages.length) {
+              if (errorsBox) {
+                errorsBox.innerHTML = messages.filter(function (m, i, arr) { return arr.indexOf(m) === i; }).join('<br>');
+                errorsBox.classList.remove('d-none');
+              }
+              return;
+            }
+
+            var storeUrl = modalCreerEl ? modalCreerEl.getAttribute('data-store-url') : '';
+            btnSaveCreate.disabled = true;
+            fetch(storeUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: JSON.stringify({ nom: nom, lignes: lignes })
+            })
+              .then(function (res) {
+                return res.json().then(function (data) {
+                  return { ok: res.ok, status: res.status, data: data };
+                });
+              })
+              .then(function (result) {
+                btnSaveCreate.disabled = false;
+                if (!result.ok) {
+                  var errs = [];
+                  if (result.data && result.data.errors) {
+                    Object.keys(result.data.errors).forEach(function (key) {
+                      errs = errs.concat(result.data.errors[key]);
+                    });
+                  } else if (result.data && result.data.message) {
+                    errs.push(result.data.message);
+                  } else {
+                    errs.push('Impossible d’enregistrer le cocktail.');
+                  }
+                  if (errorsBox) {
+                    errorsBox.innerHTML = errs.join('<br>');
+                    errorsBox.classList.remove('d-none');
+                  }
+                  return;
+                }
+                upsertCocktailCatalog(result.data);
+                if (cocktailGroupeCible) applyCocktailToGroupe(cocktailGroupeCible, result.data);
+                if (modalCreer) modalCreer.hide();
+              })
+              .catch(function () {
+                btnSaveCreate.disabled = false;
+                if (errorsBox) {
+                  errorsBox.textContent = 'Impossible d’enregistrer le cocktail.';
+                  errorsBox.classList.remove('d-none');
+                }
+              });
+          });
+        }
 
         @if (($errors->any() && ! $editId) || request()->boolean('create'))
           var createEl = document.getElementById('modalNouvelleCommande');

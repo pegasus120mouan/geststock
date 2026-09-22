@@ -34,7 +34,14 @@
             <span class="text-muted ms-1">{{ $commande->resumeParfums() }}</span>
           </td>
           <td>
+            @if ($commande->isMixte())
+              <span class="badge bg-label-secondary">Mixte</span>
+            @endif
+            @if ($commande->hasLignesCocktail())
+              <span class="badge bg-label-warning">Cocktail</span>
+            @endif
             @foreach ($commande->categoriesPresentes() as $cat)
+              @continue($cat === 'cocktail')
               <span class="badge {{ $cat === 'en_gros' ? 'bg-label-info' : 'bg-label-primary' }}">
                 {{ $cat === 'en_gros' ? 'En gros' : 'Détail' }}
               </span>
@@ -101,6 +108,7 @@
                       <th>Contenance</th>
                       <th>Catégorie</th>
                       <th>Qté</th>
+                      <th>Volume</th>
                       <th>Prix unitaire</th>
                       <th>Montant</th>
                     </tr>
@@ -108,14 +116,20 @@
                   <tbody>
                     @foreach ($commande->lignes as $ligne)
                       <tr>
-                        <td>{{ $ligne->produit?->nom ?? '—' }}</td>
+                        <td>
+                          {{ $ligne->produit?->nom ?? '—' }}
+                          @if ($ligne->isCocktail())
+                            <div class="small text-muted">{{ rtrim(rtrim(number_format((float) $ligne->quantite_ml, 2, ',', ' '), '0'), ',') }} ml dans le mélange</div>
+                          @endif
+                        </td>
                         <td>{{ $ligne->flacon ? $ligne->flacon->contenance_ml.' ml' : '—' }}</td>
                         <td>
-                          <span class="badge {{ $ligne->isEnGros() ? 'bg-label-info' : 'bg-label-primary' }}">
+                          <span class="badge {{ $ligne->isCocktail() ? 'bg-label-warning' : ($ligne->isEnGros() ? 'bg-label-info' : 'bg-label-primary') }}">
                             {{ $ligne->categorieLabel() }}
                           </span>
                         </td>
                         <td>{{ $ligne->quantite }}</td>
+                        <td>{{ rtrim(rtrim(number_format($ligne->volumeMl(), 2, ',', ' '), '0'), ',') }} ml</td>
                         <td>{{ $fmt($ligne->prix_unitaire) }} FCFA</td>
                         <td class="fw-semibold">{{ $fmt($ligne->montant()) }} FCFA</td>
                       </tr>

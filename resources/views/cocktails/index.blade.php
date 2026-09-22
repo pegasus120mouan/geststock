@@ -4,10 +4,12 @@
 
 @section('content')
 @php
-  $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
   $oldLignes = old('lignes');
-  $createRows = $oldLignes ?: [['produit_id' => '', 'quantite_ml' => '']];
   $editId = old('_edit_id', request('edit'));
+  $keepCreateInput = $errors->any() && ! $editId;
+  $createRows = $keepCreateInput && is_array($oldLignes)
+    ? $oldLignes
+    : [['produit_id' => ''], ['produit_id' => '']];
 @endphp
 
 <div class="content-wrapper">
@@ -15,7 +17,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div>
         <h4 class="mb-1">Cocktails</h4>
-        <p class="mb-0 text-muted">Associations de parfums avec leurs quantités</p>
+        <p class="mb-0 text-muted">Associations de parfums. Les quantités se saisissent à la commande.</p>
       </div>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNouveauCocktail">
         <i class="bx bx-plus me-1"></i>Nouveau cocktail
@@ -58,7 +60,6 @@
             <tr>
               <th>Nom</th>
               <th>Parfums</th>
-              <th>Volume total</th>
               <th>Statut</th>
               <th class="text-end">Actions</th>
             </tr>
@@ -74,7 +75,6 @@
                 <td>
                   <span class="badge bg-label-primary">{{ $cocktail->lignes_count }}</span>
                 </td>
-                <td>{{ $fmt($cocktail->volumeTotalMl()) }} ml</td>
                 <td>
                   <span class="badge {{ $cocktail->isActif() ? 'bg-label-success' : 'bg-label-secondary' }}">
                     {{ ucfirst($cocktail->statut) }}
@@ -104,7 +104,7 @@
               </tr>
             @empty
               <tr>
-                <td colspan="5" class="text-center py-5 text-muted">Aucun cocktail enregistré.</td>
+                <td colspan="4" class="text-center py-5 text-muted">Aucun cocktail enregistré.</td>
               </tr>
             @endforelse
           </tbody>
@@ -123,10 +123,10 @@
             <h5 class="modal-title">Nouveau cocktail</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <form method="POST" action="{{ route('cocktails.store') }}">
+          <form method="POST" action="{{ route('cocktails.store') }}" autocomplete="off" id="formNouveauCocktail">
             @csrf
             <div class="modal-body">
-              @if ($errors->any() && ! $editId)
+              @if ($keepCreateInput)
                 <div class="alert alert-danger">
                   <ul class="mb-0">
                     @foreach ($errors->all() as $error)
@@ -143,7 +143,9 @@
                     type="text"
                     name="nom"
                     class="form-control @error('nom') is-invalid @enderror"
-                    value="{{ old('nom') }}"
+                    value="{{ $keepCreateInput ? old('nom') : '' }}"
+                    placeholder="Nom du cocktail"
+                    autocomplete="off"
                     required />
                   @error('nom')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
@@ -168,7 +170,6 @@
                   <thead>
                     <tr>
                       <th>Parfum <span class="text-danger">*</span></th>
-                      <th style="width: 160px;">Quantité (ml) <span class="text-danger">*</span></th>
                       <th style="width: 60px;"></th>
                     </tr>
                   </thead>
@@ -176,7 +177,7 @@
                     @foreach ($createRows as $index => $ligne)
                       <tr class="ligne-cocktail">
                         <td>
-                          <select name="lignes[{{ $index }}][produit_id]" class="form-select" required>
+                          <select name="lignes[{{ $index }}][produit_id]" class="form-select">
                             <option value="">Sélectionner un parfum</option>
                             @foreach ($produits as $produit)
                               <option value="{{ $produit->id }}" @selected((string) ($ligne['produit_id'] ?? '') === (string) $produit->id)>
@@ -184,17 +185,6 @@
                               </option>
                             @endforeach
                           </select>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            name="lignes[{{ $index }}][quantite_ml]"
-                            class="form-control"
-                            min="0.01"
-                            step="0.01"
-                            placeholder="Ex: 10"
-                            value="{{ $ligne['quantite_ml'] ?? '' }}"
-                            required />
                         </td>
                         <td class="text-end">
                           <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne" title="Retirer">
@@ -222,8 +212,8 @@
         $editRows = $isThisEdit && is_array($oldLignes)
           ? $oldLignes
           : ($cocktail->lignes->isNotEmpty()
-            ? $cocktail->lignes->map(fn ($l) => ['produit_id' => $l->produit_id, 'quantite_ml' => $l->quantite_ml])->all()
-            : [['produit_id' => '', 'quantite_ml' => '']]);
+            ? $cocktail->lignes->map(fn ($l) => ['produit_id' => $l->produit_id])->all()
+            : [['produit_id' => ''], ['produit_id' => '']]);
       @endphp
 
       <div class="modal fade" id="modalEditCocktail{{ $cocktail->id }}" tabindex="-1" aria-hidden="true">
@@ -279,7 +269,6 @@
                     <thead>
                       <tr>
                         <th>Parfum <span class="text-danger">*</span></th>
-                        <th style="width: 160px;">Quantité (ml) <span class="text-danger">*</span></th>
                         <th style="width: 60px;"></th>
                       </tr>
                     </thead>
@@ -295,17 +284,6 @@
                                 </option>
                               @endforeach
                             </select>
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              name="lignes[{{ $index }}][quantite_ml]"
-                              class="form-control"
-                              min="0.01"
-                              step="0.01"
-                              placeholder="Ex: 10"
-                              value="{{ $ligne['quantite_ml'] ?? '' }}"
-                              required />
                           </td>
                           <td class="text-end">
                             <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne" title="Retirer">
@@ -353,22 +331,12 @@
     <template id="tplLigneCocktail">
       <tr class="ligne-cocktail">
         <td>
-          <select name="lignes[__INDEX__][produit_id]" class="form-select" required>
+          <select name="lignes[__INDEX__][produit_id]" class="form-select">
             <option value="">Sélectionner un parfum</option>
             @foreach ($produits as $produit)
               <option value="{{ $produit->id }}">{{ $produit->nom }}</option>
             @endforeach
           </select>
-        </td>
-        <td>
-          <input
-            type="number"
-            name="lignes[__INDEX__][quantite_ml]"
-            class="form-control"
-            min="0.01"
-            step="0.01"
-            placeholder="Ex: 10"
-            required />
         </td>
         <td class="text-end">
           <button type="button" class="btn btn-sm btn-outline-danger btn-remove-ligne" title="Retirer">
@@ -381,6 +349,39 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var tpl = document.getElementById('tplLigneCocktail').innerHTML;
+        var keepCreateInput = @json($keepCreateInput);
+
+        function remplirLignesVides(tbody, count) {
+          if (!tbody) return;
+          tbody.innerHTML = '';
+          for (var i = 0; i < count; i++) {
+            tbody.insertAdjacentHTML('beforeend', tpl.replaceAll('__INDEX__', String(i)));
+          }
+        }
+
+        function resetFormNouveauCocktail() {
+          var form = document.getElementById('formNouveauCocktail');
+          if (!form) return;
+          form.reset();
+          var nom = form.querySelector('input[name="nom"]');
+          if (nom) nom.value = '';
+          var statut = form.querySelector('select[name="statut"]');
+          if (statut) statut.value = 'actif';
+          var alertBox = form.querySelector('.alert-danger');
+          if (alertBox) alertBox.classList.add('d-none');
+          remplirLignesVides(document.querySelector('#createLignes tbody'), 2);
+        }
+
+        var createEl = document.getElementById('modalNouveauCocktail');
+        if (createEl) {
+          createEl.addEventListener('show.bs.modal', function () {
+            if (keepCreateInput) {
+              keepCreateInput = false;
+              return;
+            }
+            resetFormNouveauCocktail();
+          });
+        }
 
         document.querySelectorAll('.btn-add-ligne').forEach(function (btn) {
           btn.addEventListener('click', function () {
@@ -398,12 +399,11 @@
           var tbody = btn.closest('tbody');
           if (!tbody) return;
           var rows = tbody.querySelectorAll('.ligne-cocktail');
-          if (rows.length <= 1) return;
+          if (rows.length <= 2) return;
           btn.closest('tr').remove();
         });
 
-        @if (($errors->any() && ! $editId) || request()->boolean('create'))
-          var createEl = document.getElementById('modalNouveauCocktail');
+        @if ($keepCreateInput || request()->boolean('create'))
           if (createEl && window.bootstrap) new bootstrap.Modal(createEl).show();
         @elseif ($editId)
           var editEl = document.getElementById('modalEditCocktail{{ $editId }}');

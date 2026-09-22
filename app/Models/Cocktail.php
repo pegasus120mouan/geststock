@@ -30,4 +30,25 @@ class Cocktail extends Model
     {
         return (float) $this->lignes->sum('quantite_ml');
     }
+
+    /**
+     * @return array{id: int, nom: string, volume_ml: float, lignes: array<int, array{produit_id: int, nom: string|null, quantite_ml: float|null}>}
+     */
+    public function toCatalogArray(): array
+    {
+        $this->loadMissing('lignes.produit');
+
+        return [
+            'id' => $this->id,
+            'nom' => $this->nom,
+            'volume_ml' => (float) $this->volumeTotalMl(),
+            'lignes' => $this->lignes->map(function (CocktailLigne $ligne) {
+                return [
+                    'produit_id' => $ligne->produit_id,
+                    'nom' => $ligne->produit?->nom,
+                    'quantite_ml' => $ligne->quantite_ml !== null ? (float) $ligne->quantite_ml : null,
+                ];
+            })->values()->all(),
+        ];
+    }
 }

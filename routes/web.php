@@ -38,6 +38,7 @@ Route::middleware(['auth', 'module'])->group(function () {
     Route::get('/stock/sorties', [StockController::class, 'sorties'])->name('stock.sorties');
 
     Route::get('/commandes', [CommandeController::class, 'index'])->name('commandes.index');
+    Route::post('/commandes/cocktails', [CocktailController::class, 'storeFromCommande'])->name('commandes.cocktails.store');
     Route::post('/commandes', [CommandeController::class, 'store'])->name('commandes.store');
     Route::put('/commandes/{commande}', [CommandeController::class, 'update'])->name('commandes.update');
     Route::patch('/commandes/{commande}/statut', [CommandeController::class, 'updateStatut'])->name('commandes.statut');

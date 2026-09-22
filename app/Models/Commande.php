@@ -11,8 +11,16 @@ class Commande extends Model
 {
     use HasFactory;
 
+    public const TYPE_NORMALE = 'normale';
+
+    public const TYPE_COCKTAIL = 'cocktail';
+
+    public const TYPE_MIXTE = 'mixte';
+
     protected $fillable = [
         'reference',
+        'type',
+        'cocktail_id',
         'date_commande',
         'client_nom',
         'client_telephone',
@@ -24,6 +32,10 @@ class Commande extends Model
         'ovl_commande_id',
         'ovl_sent_at',
         'user_id',
+    ];
+
+    protected $attributes = [
+        'type' => self::TYPE_NORMALE,
     ];
 
     protected function casts(): array
@@ -46,9 +58,35 @@ class Commande extends Model
         return $this->belongsTo(Commune::class);
     }
 
+    public function cocktail(): BelongsTo
+    {
+        return $this->belongsTo(Cocktail::class);
+    }
+
     public function lignes(): HasMany
     {
         return $this->hasMany(CommandeLigne::class)->orderBy('id');
+    }
+
+    public function isCocktail(): bool
+    {
+        return in_array($this->type, [self::TYPE_COCKTAIL, self::TYPE_MIXTE], true);
+    }
+
+    public function isMixte(): bool
+    {
+        return $this->type === self::TYPE_MIXTE
+            || ($this->hasLignesCocktail() && $this->hasLignesNormales());
+    }
+
+    public function hasLignesCocktail(): bool
+    {
+        return $this->lignes->contains(fn (CommandeLigne $l) => $l->quantite_ml !== null);
+    }
+
+    public function hasLignesNormales(): bool
+    {
+        return $this->lignes->contains(fn (CommandeLigne $l) => $l->quantite_ml === null);
     }
 
     public function montantArticles(): float
@@ -88,18 +126,26 @@ class Commande extends Model
 
     public function resumeParfums(int $limit = 2): string
     {
-        $noms = $this->lignes
+        $parts = collect();
+
+        if ($this->cocktail?->nom) {
+            $parts->push($this->cocktail->nom);
+        }
+
+        $this->lignes
             ->map(fn (CommandeLigne $l) => $l->produit?->nom)
             ->filter()
             ->unique()
-            ->values();
+            ->each(fn ($nom) => $parts->push($nom));
 
-        if ($noms->isEmpty()) {
+        $parts = $parts->unique()->values();
+
+        if ($parts->isEmpty()) {
             return '—';
         }
 
-        $affiche = $noms->take($limit)->implode(', ');
-        $reste = $noms->count() - $limit;
+        $affiche = $parts->take($limit)->implode(', ');
+        $reste = $parts->count() - $limit;
 
         return $reste > 0 ? $affiche.' (+'.$reste.')' : $affiche;
     }

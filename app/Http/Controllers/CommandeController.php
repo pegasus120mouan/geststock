@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\VolumeUnit;
+use App\Models\Cocktail;
 use App\Models\Commande;
 use App\Models\CommandeLigne;
 use App\Models\Commune;
@@ -24,7 +25,7 @@ class CommandeController extends Controller
     public function index(Request $request)
     {
         $baseQuery = Commande::query()
-            ->with(['lignes.produit', 'lignes.flacon', 'commune'])
+            ->with(['lignes.produit', 'lignes.flacon', 'commune', 'cocktail'])
             ->withCount('lignes')
             ->when($request->filled('q'), function ($query) use ($request) {
                 $q = '%'.$request->string('q').'%';
@@ -33,6 +34,7 @@ class CommandeController extends Controller
                         ->orWhere('client_nom', 'like', $q)
                         ->orWhere('client_telephone', 'like', $q)
                         ->orWhereHas('commune', fn ($c) => $c->where('nom', 'like', $q))
+                        ->orWhereHas('cocktail', fn ($c) => $c->where('nom', 'like', $q))
                         ->orWhereHas('lignes.produit', fn ($p) => $p->where('nom', 'like', $q));
                 });
             })
@@ -45,6 +47,13 @@ class CommandeController extends Controller
 
         $commandesDetail = (clone $baseQuery)
             ->whereHas('lignes', fn ($q) => $q->where('categorie', PrixUnitaire::CATEGORIE_DETAIL))
+            ->get();
+
+        $commandesCocktail = (clone $baseQuery)
+            ->where(function ($query) {
+                $query->whereIn('type', [Commande::TYPE_COCKTAIL, Commande::TYPE_MIXTE])
+                    ->orWhereHas('lignes', fn ($l) => $l->whereNotNull('quantite_ml'));
+            })
             ->get();
 
         $produits = Produit::query()
@@ -64,26 +73,44 @@ class CommandeController extends Controller
             ->orderBy('nom')
             ->get(['id', 'nom']);
 
-        $allCommandes = $commandesEnGros->concat($commandesDetail)->unique('id')->values();
+        $cocktails = Cocktail::query()
+            ->where('statut', 'actif')
+            ->with(['lignes.produit'])
+            ->orderBy('nom')
+            ->get();
+
+        $cocktailsCatalog = $cocktails->map(fn (Cocktail $cocktail) => $cocktail->toCatalogArray())->values();
+
+        $allCommandes = $commandesEnGros
+            ->concat($commandesDetail)
+            ->concat($commandesCocktail)
+            ->unique('id')
+            ->values();
 
         return view('commandes.index', compact(
             'commandesEnGros',
             'commandesDetail',
+            'commandesCocktail',
             'allCommandes',
             'produits',
             'flacons',
-            'communes'
+            'communes',
+            'cocktails',
+            'cocktailsCatalog'
         ));
     }
 
     public function store(Request $request)
     {
         $validated = $this->validateCommande($request);
-        $lignesPreparees = $this->preparerLignes($validated['lignes']);
+        $lignesPreparees = $this->preparerLignes($validated);
 
         if ($lignesPreparees instanceof \Illuminate\Http\RedirectResponse) {
             return $lignesPreparees;
         }
+
+        $validated['type'] = $this->typeDepuisLignes($lignesPreparees);
+        $validated['cocktail_id'] = $this->cocktailIdDepuisGroupes($validated['groupes_cocktail'] ?? []);
 
         $fraisLivraison = $this->fraisLivraisonPourCommune((int) $validated['commune_id']);
         $totalArticles = round(collect($lignesPreparees)->sum('total'), 2);
@@ -93,6 +120,8 @@ class CommandeController extends Controller
             DB::transaction(function () use ($validated, $lignesPreparees, $totalCommande, $fraisLivraison) {
                 $commande = Commande::query()->create([
                     'date_commande' => $validated['date_commande'],
+                    'type' => $validated['type'],
+                    'cocktail_id' => $validated['cocktail_id'] ?? null,
                     'client_nom' => $validated['client_nom'] ?? null,
                     'client_telephone' => $validated['client_telephone'],
                     'commune_id' => $validated['commune_id'],
@@ -121,23 +150,32 @@ class CommandeController extends Controller
         }
 
         return redirect()
-            ->route('commandes.index')
+            ->route('commandes.index', [
+                'section' => in_array($validated['type'], [Commande::TYPE_COCKTAIL, Commande::TYPE_MIXTE], true)
+                    ? 'cocktail'
+                    : 'en_gros',
+            ])
             ->with('success', 'Commande créée avec succès.');
     }
 
     public function update(Request $request, Commande $commande)
     {
         $validated = $this->validateCommande($request);
-        $lignesPreparees = $this->preparerLignes($validated['lignes'], $commande->id);
+        $lignesPreparees = $this->preparerLignes($validated, $commande->id);
 
         if ($lignesPreparees instanceof \Illuminate\Http\RedirectResponse) {
             return $lignesPreparees;
         }
 
+        $validated['type'] = $this->typeDepuisLignes($lignesPreparees);
+        $validated['cocktail_id'] = $this->cocktailIdDepuisGroupes($validated['groupes_cocktail'] ?? []);
+
         $fraisLivraison = $this->fraisLivraisonPourCommune((int) $validated['commune_id']);
         $totalArticles = round(collect($lignesPreparees)->sum('total'), 2);
         $totalCommande = round($totalArticles + $fraisLivraison, 2);
-        $section = $request->input('section', 'en_gros');
+        $section = in_array($validated['type'], [Commande::TYPE_COCKTAIL, Commande::TYPE_MIXTE], true)
+            ? 'cocktail'
+            : $request->input('section', 'en_gros');
         $ancienStatut = $commande->statut;
         $nouveauStatut = $validated['statut'];
 
@@ -160,6 +198,8 @@ class CommandeController extends Controller
 
                 $commande->update([
                     'date_commande' => $validated['date_commande'],
+                    'type' => $validated['type'],
+                    'cocktail_id' => $validated['cocktail_id'] ?? null,
                     'client_nom' => $validated['client_nom'] ?? null,
                     'client_telephone' => $validated['client_telephone'],
                     'commune_id' => $validated['commune_id'],
@@ -264,18 +304,24 @@ class CommandeController extends Controller
             'commune_id' => ['required', 'integer', Rule::exists('communes', 'id')],
             'statut' => ['required', 'in:en_attente,confirmee,livree,annulee'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'lignes' => ['required', 'array', 'min:1'],
-            'lignes.*.produit_id' => ['required', 'integer', Rule::exists('produits', 'id')],
-            'lignes.*.flacon_id' => ['required', 'integer', Rule::exists('flacons', 'id')],
-            'lignes.*.categorie' => ['required', Rule::in(array_keys(PrixUnitaire::categories()))],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes' => ['nullable', 'array'],
+            'lignes.*.produit_id' => ['nullable', 'integer', Rule::exists('produits', 'id')],
+            'lignes.*.flacon_id' => ['nullable', 'integer', Rule::exists('flacons', 'id')],
+            'lignes.*.categorie' => ['nullable', Rule::in(array_keys(PrixUnitaire::categories()))],
+            'lignes.*.quantite' => ['nullable', 'integer', 'min:1'],
+            'groupes_cocktail' => ['nullable', 'array'],
+            'groupes_cocktail.*.categorie' => ['nullable', Rule::in(array_keys(PrixUnitaire::categories()))],
+            'groupes_cocktail.*.flacon_id' => ['nullable', 'integer', Rule::exists('flacons', 'id')],
+            'groupes_cocktail.*.quantite' => ['nullable', 'integer', 'min:1'],
+            'groupes_cocktail.*.cocktail_id' => ['nullable', 'integer', Rule::exists('cocktails', 'id')],
+            'groupes_cocktail.*.parfums' => ['nullable', 'array'],
+            'groupes_cocktail.*.parfums.*.produit_id' => ['nullable', 'integer', Rule::exists('produits', 'id')],
+            'groupes_cocktail.*.parfums.*.quantite_ml' => ['nullable', 'numeric', 'gt:0'],
         ], [
             'commune_id.required' => 'Sélectionnez une commune.',
-            'lignes.required' => 'Ajoutez au moins un parfum à la commande.',
             'lignes.*.produit_id.required' => 'Sélectionnez un parfum.',
             'lignes.*.flacon_id.required' => 'Sélectionnez une contenance.',
-            'lignes.*.categorie.required' => 'Sélectionnez une catégorie.',
-            'lignes.*.quantite.required' => 'Indiquez la quantité.',
+            'groupes_cocktail.*.parfums.*.quantite_ml.gt' => 'La quantité d’un parfum doit être supérieure à 0 ml.',
         ]);
     }
 
@@ -296,9 +342,94 @@ class CommandeController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $validated
      * @return array<int, array<string, mixed>>|\Illuminate\Http\RedirectResponse
      */
-    private function preparerLignes(array $lignes, ?int $editId = null)
+    private function preparerLignes(array $validated, ?int $editId = null)
+    {
+        $preparees = [];
+
+        $normales = collect($validated['lignes'] ?? [])
+            ->filter(fn ($ligne) => filled($ligne['produit_id'] ?? null))
+            ->all();
+
+        if ($normales !== []) {
+            $result = $this->preparerLignesNormales($normales, $editId);
+            if ($result instanceof \Illuminate\Http\RedirectResponse) {
+                return $result;
+            }
+            $preparees = array_merge($preparees, $result);
+        }
+
+        foreach ($validated['groupes_cocktail'] ?? [] as $gIndex => $groupe) {
+            $parfums = collect($groupe['parfums'] ?? [])
+                ->filter(fn ($parfum) => filled($parfum['produit_id'] ?? null) && (float) ($parfum['quantite_ml'] ?? 0) > 0)
+                ->all();
+
+            $aDesParfumsSansQte = collect($groupe['parfums'] ?? [])
+                ->contains(fn ($parfum) => filled($parfum['produit_id'] ?? null) && (float) ($parfum['quantite_ml'] ?? 0) <= 0);
+
+            if ($parfums === [] && (filled($groupe['cocktail_id'] ?? null) || $aDesParfumsSansQte)) {
+                return $this->redirectErreursLignes([
+                    "groupes_cocktail.$gIndex.parfums" => 'Indiquez la quantité (ml) de chaque parfum du cocktail.',
+                ], $editId);
+            }
+
+            if ($parfums === []) {
+                continue;
+            }
+
+            $result = $this->preparerUnGroupeCocktail($groupe, $parfums, (int) $gIndex, $editId);
+            if ($result instanceof \Illuminate\Http\RedirectResponse) {
+                return $result;
+            }
+            $preparees = array_merge($preparees, $result);
+        }
+
+        if ($preparees === []) {
+            return $this->redirectErreursLignes([
+                'lignes' => 'Ajoutez au moins un parfum normal ou un cocktail à la commande.',
+            ], $editId);
+        }
+
+        return $preparees;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lignesPreparees
+     */
+    private function typeDepuisLignes(array $lignesPreparees): string
+    {
+        $hasCocktail = collect($lignesPreparees)->contains(fn ($ligne) => ($ligne['quantite_ml'] ?? null) !== null);
+        $hasNormal = collect($lignesPreparees)->contains(fn ($ligne) => ($ligne['quantite_ml'] ?? null) === null);
+
+        if ($hasCocktail && $hasNormal) {
+            return Commande::TYPE_MIXTE;
+        }
+
+        return $hasCocktail ? Commande::TYPE_COCKTAIL : Commande::TYPE_NORMALE;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $groupes
+     */
+    private function cocktailIdDepuisGroupes(array $groupes): ?int
+    {
+        $ids = collect($groupes)
+            ->pluck('cocktail_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        return $ids->count() === 1 ? $ids->first() : null;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lignes
+     * @return array<int, array<string, mixed>>|\Illuminate\Http\RedirectResponse
+     */
+    private function preparerLignesNormales(array $lignes, ?int $editId = null)
     {
         $lignesPreparees = [];
         $erreurs = [];
@@ -312,6 +443,12 @@ class CommandeController extends Controller
             ->keyBy('id');
 
         foreach ($lignes as $index => $ligne) {
+            $qte = (int) ($ligne['quantite'] ?? 0);
+            if ($qte < 1 || empty($ligne['flacon_id']) || empty($ligne['categorie'])) {
+                $erreurs["lignes.$index.produit_id"] = 'Catégorie, contenance et quantité sont obligatoires pour chaque parfum.';
+                continue;
+            }
+
             $tarif = PrixUnitaire::trouver(
                 (int) $ligne['produit_id'],
                 (int) $ligne['flacon_id'],
@@ -342,23 +479,136 @@ class CommandeController extends Controller
                 'flacon_id' => (int) $ligne['flacon_id'],
                 'categorie' => $ligne['categorie'],
                 'quantite' => $qte,
+                'quantite_ml' => null,
                 'prix_unitaire' => $prix,
                 'total' => round($prix * $qte, 2),
             ];
         }
 
         if ($erreurs !== []) {
-            $params = $editId
-                ? ['edit' => $editId]
-                : ['create' => 1];
-
-            return redirect()
-                ->route('commandes.index', $params)
-                ->withInput()
-                ->withErrors($erreurs);
+            return $this->redirectErreursLignes($erreurs, $editId);
         }
 
         return $lignesPreparees;
+    }
+
+    /**
+     * @param  array<string, mixed>  $groupe
+     * @param  array<int, array<string, mixed>>  $parfums
+     * @return array<int, array<string, mixed>>|\Illuminate\Http\RedirectResponse
+     */
+    private function preparerUnGroupeCocktail(array $groupe, array $parfums, int $gIndex, ?int $editId = null)
+    {
+        $flaconId = (int) ($groupe['flacon_id'] ?? 0);
+        $categorie = $groupe['categorie'] ?? '';
+        $nbFlacons = (int) ($groupe['quantite'] ?? 0);
+
+        if ($flaconId <= 0 || ! in_array($categorie, array_keys(PrixUnitaire::categories()), true) || $nbFlacons < 1) {
+            return $this->redirectErreursLignes([
+                "groupes_cocktail.$gIndex.flacon_id" => 'Catégorie, contenance et nombre de flacons sont obligatoires pour un cocktail.',
+            ], $editId);
+        }
+
+        $flacon = Flacon::query()->find($flaconId);
+        $contenance = (int) ($flacon?->contenance_ml ?? 0);
+        $labelPrix = $categorie === PrixUnitaire::CATEGORIE_EN_GROS ? 'gros' : 'détail';
+        $erreurs = [];
+
+        if ($contenance <= 0) {
+            return $this->redirectErreursLignes([
+                "groupes_cocktail.$gIndex.flacon_id" => 'Contenance invalide pour ce cocktail.',
+            ], $editId);
+        }
+
+        $parParfum = [];
+        foreach ($parfums as $index => $ligne) {
+            $produitId = (int) $ligne['produit_id'];
+            $ml = round((float) $ligne['quantite_ml'], 2);
+
+            if (isset($parParfum[$produitId])) {
+                $parParfum[$produitId]['ml'] = round($parParfum[$produitId]['ml'] + $ml, 2);
+                continue;
+            }
+
+            $parParfum[$produitId] = [
+                'index' => $index,
+                'produit_id' => $produitId,
+                'ml' => $ml,
+            ];
+        }
+
+        if (count($parParfum) < 2) {
+            return $this->redirectErreursLignes([
+                "groupes_cocktail.$gIndex.parfums" => 'Un cocktail doit associer au moins deux parfums différents.',
+            ], $editId);
+        }
+
+        $volumeTotal = round(collect($parParfum)->sum('ml'), 2);
+
+        if (abs($volumeTotal - $contenance) > 0.01) {
+            $ecart = round($volumeTotal - $contenance, 2);
+            $message = $ecart > 0
+                ? "Le cocktail fait {$volumeTotal} ml, soit {$ecart} ml de trop pour un flacon de {$contenance} ml."
+                : "Le cocktail fait {$volumeTotal} ml : il manque ".abs($ecart)." ml pour remplir le flacon de {$contenance} ml.";
+
+            return $this->redirectErreursLignes([
+                "groupes_cocktail.$gIndex.flacon_id" => $message,
+            ], $editId);
+        }
+
+        $produits = Produit::query()
+            ->whereIn('id', array_keys($parParfum))
+            ->get()
+            ->keyBy('id');
+
+        $lignesPreparees = [];
+
+        foreach ($parParfum as $item) {
+            $index = $item['index'];
+            $produit = $produits->get($item['produit_id']);
+            $parfum = $produit?->nom ?: 'inconnu';
+
+            $tarif = PrixUnitaire::trouver($item['produit_id'], $flaconId, $categorie);
+
+            if (! $tarif) {
+                $erreurs["groupes_cocktail.$gIndex.parfums.$index.produit_id"] = "Parfum : {$parfum}, contenance : {$contenance} ml, prix {$labelPrix} manquant.";
+                continue;
+            }
+
+            $part = $item['ml'] / $contenance;
+            $prixUnitaire = round((float) $tarif->prix * $part, 2);
+
+            $lignesPreparees[] = [
+                'produit_id' => $item['produit_id'],
+                'flacon_id' => $flaconId,
+                'categorie' => $categorie,
+                'quantite' => $nbFlacons,
+                'quantite_ml' => $item['ml'],
+                'prix_unitaire' => $prixUnitaire,
+                'total' => round($prixUnitaire * $nbFlacons, 2),
+            ];
+        }
+
+        if ($erreurs !== []) {
+            return $this->redirectErreursLignes($erreurs, $editId);
+        }
+
+        return $lignesPreparees;
+    }
+
+    /**
+     * @param  array<string, string>  $erreurs
+     */
+    private function redirectErreursLignes(array $erreurs, ?int $editId = null): \Illuminate\Http\RedirectResponse
+    {
+        $params = $editId
+            ? ['edit' => $editId]
+            : ['create' => 1];
+
+        return redirect()
+            ->route('commandes.index', $params)
+            ->withInput()
+            ->withErrors($erreurs);
     }
 
     private function deduireStock(Commande $commande): void
@@ -428,8 +678,10 @@ class CommandeController extends Controller
             'stock_apres' => $stockApres,
             'commentaire' => ($type === 'sortie' ? 'Livraison' : 'Annulation livraison').
                 ' commande '.$commande->reference.
-                ' ('.$ligne->flacon->contenance_ml.' ml × '.$ligne->quantite.
-                ' — '.$ligne->categorieLabel().')',
+                ($ligne->isCocktail()
+                    ? ' (cocktail '.$ligne->quantite_ml.' ml × '.$ligne->quantite.' — '.$ligne->categorieLabel().')'
+                    : ' ('.$ligne->flacon->contenance_ml.' ml × '.$ligne->quantite.
+                        ' — '.$ligne->categorieLabel().')'),
         ]);
     }
 

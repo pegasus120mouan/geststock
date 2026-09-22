@@ -3,17 +3,13 @@
 @section('title', $cocktail->nom)
 
 @section('content')
-@php
-  $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
-@endphp
-
 <div class="content-wrapper">
   <div class="container-xxl flex-grow-1 container-p-y">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
       <div>
         <h4 class="mb-1">{{ $cocktail->nom }}</h4>
         <p class="mb-0 text-muted">
-          Volume total : <strong>{{ $fmt($cocktail->volumeTotalMl()) }} ml</strong>
+          {{ $cocktail->lignes->count() }} parfum{{ $cocktail->lignes->count() > 1 ? 's' : '' }}
           ·
           <span class="badge {{ $cocktail->isActif() ? 'bg-label-success' : 'bg-label-secondary' }}">
             {{ ucfirst($cocktail->statut) }}
@@ -39,19 +35,16 @@
 
     <div class="card">
       <div class="card-header">
-        <h5 class="mb-0">Composition (parfum + quantité)</h5>
+        <h5 class="mb-0">Composition</h5>
       </div>
       <div class="table-responsive">
         <table class="table mb-0">
           <thead>
             <tr>
               <th>Parfum</th>
-              <th>Quantité</th>
-              <th>Part</th>
             </tr>
           </thead>
           <tbody>
-            @php $total = max($cocktail->volumeTotalMl(), 0.0001); @endphp
             @forelse ($cocktail->lignes as $ligne)
               <tr>
                 <td class="fw-medium">
@@ -63,23 +56,13 @@
                     —
                   @endif
                 </td>
-                <td>{{ $fmt($ligne->quantite_ml) }} ml</td>
-                <td>{{ number_format(((float) $ligne->quantite_ml / $total) * 100, 1, ',', ' ') }} %</td>
               </tr>
             @empty
               <tr>
-                <td colspan="3" class="text-center text-muted py-4">Aucune composition.</td>
+                <td class="text-center text-muted py-4">Aucune composition.</td>
               </tr>
             @endforelse
           </tbody>
-          @if ($cocktail->lignes->isNotEmpty())
-            <tfoot>
-              <tr>
-                <th>Total</th>
-                <th colspan="2">{{ $fmt($cocktail->volumeTotalMl()) }} ml</th>
-              </tr>
-            </tfoot>
-          @endif
         </table>
       </div>
     </div>
