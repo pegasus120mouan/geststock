@@ -332,7 +332,7 @@
                 <div class="text-truncate">Commandes</div>
               </a>
               <ul class="menu-sub">
-                <li class="menu-item {{ request()->routeIs('commandes.index') ? 'active' : '' }}">
+                <li class="menu-item {{ request()->routeIs('commandes.index') || request()->routeIs('commandes.show') ? 'active' : '' }}">
                   <a href="{{ route('commandes.index') }}" class="menu-link">
                     <div class="text-truncate">Liste des commandes</div>
                   </a>

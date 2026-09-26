@@ -5,11 +5,12 @@
 @section('content')
 @php
   $fmt = fn ($n) => number_format((float) $n, 0, ',', ' ');
-  $openSection = request('section', 'en_gros');
+  $openSection = $openSection ?? session('section', 'en_gros');
   if (! in_array($openSection, ['en_gros', 'detail', 'cocktail'], true)) {
     $openSection = 'en_gros';
   }
-  $editId = old('_edit_id', request('edit'));
+  $editId = $editId ?? old('_edit_id');
+  $openCreate = $openCreate ?? false;
   $produitsById = $produits->keyBy('id');
   $createLignesNormales = old('lignes', [[
     'categorie' => $openSection === 'en_gros' ? 'en_gros' : 'detail',
@@ -1371,7 +1372,7 @@
           });
         }
 
-        @if (($errors->any() && ! $editId) || request()->boolean('create'))
+        @if (($errors->any() && ! $editId) || $openCreate)
           var createEl = document.getElementById('modalNouvelleCommande');
           if (createEl && window.bootstrap) new bootstrap.Modal(createEl).show();
         @elseif ($editId)

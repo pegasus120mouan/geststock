@@ -40,6 +40,7 @@ Route::middleware(['auth', 'module'])->group(function () {
     Route::get('/commandes', [CommandeController::class, 'index'])->name('commandes.index');
     Route::post('/commandes/cocktails', [CocktailController::class, 'storeFromCommande'])->name('commandes.cocktails.store');
     Route::post('/commandes', [CommandeController::class, 'store'])->name('commandes.store');
+    Route::get('/commandes/{commande}', [CommandeController::class, 'show'])->name('commandes.show');
     Route::put('/commandes/{commande}', [CommandeController::class, 'update'])->name('commandes.update');
     Route::patch('/commandes/{commande}/statut', [CommandeController::class, 'updateStatut'])->name('commandes.statut');
     Route::post('/commandes/{commande}/envoyer-ovl', [CommandeController::class, 'envoyerOvl'])->name('commandes.envoyer-ovl');

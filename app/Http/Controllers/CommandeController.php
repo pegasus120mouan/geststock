@@ -24,80 +24,45 @@ class CommandeController extends Controller
 {
     public function index(Request $request)
     {
-        $baseQuery = Commande::query()
-            ->with(['lignes.produit', 'lignes.flacon', 'commune', 'cocktail'])
-            ->withCount('lignes')
-            ->when($request->filled('q'), function ($query) use ($request) {
-                $q = '%'.$request->string('q').'%';
-                $query->where(function ($inner) use ($q) {
-                    $inner->where('reference', 'like', $q)
-                        ->orWhere('client_nom', 'like', $q)
-                        ->orWhere('client_telephone', 'like', $q)
-                        ->orWhereHas('commune', fn ($c) => $c->where('nom', 'like', $q))
-                        ->orWhereHas('cocktail', fn ($c) => $c->where('nom', 'like', $q))
-                        ->orWhereHas('lignes.produit', fn ($p) => $p->where('nom', 'like', $q));
-                });
-            })
-            ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
-            ->latest();
+        if ($request->has('edit') || $request->has('create')) {
+            return redirect()->route('home');
+        }
 
-        $commandesEnGros = (clone $baseQuery)
-            ->whereHas('lignes', fn ($q) => $q->where('categorie', PrixUnitaire::CATEGORIE_EN_GROS))
-            ->get();
+        return view('commandes.index', $this->donneesListeCommandes($request) + [
+            'editId' => null,
+            'openSection' => $this->sectionDepuisRequete($request),
+            'openCreate' => (bool) session('open_create'),
+        ]);
+    }
 
-        $commandesDetail = (clone $baseQuery)
-            ->whereHas('lignes', fn ($q) => $q->where('categorie', PrixUnitaire::CATEGORIE_DETAIL))
-            ->get();
+    public function show(Request $request, string $commande)
+    {
+        if ($request->query()) {
+            return redirect()->route('home');
+        }
 
-        $commandesCocktail = (clone $baseQuery)
-            ->where(function ($query) {
-                $query->whereIn('type', [Commande::TYPE_COCKTAIL, Commande::TYPE_MIXTE])
-                    ->orWhereHas('lignes', fn ($l) => $l->whereNotNull('quantite_ml'));
-            })
-            ->get();
+        if (! ctype_digit($commande)) {
+            return redirect()->route('commandes.index');
+        }
 
-        $produits = Produit::query()
-            ->where('statut', 'actif')
-            ->orderBy('nom')
-            ->get(['id', 'nom']);
+        $commande = Commande::query()->find((int) $commande);
 
-        $flacons = Flacon::query()
-            ->actif()
-            ->orderBy('contenance_ml')
-            ->get(['id', 'nom', 'contenance_ml']);
+        if (! $commande) {
+            return redirect()->route('commandes.index');
+        }
 
-        $communes = Commune::query()
-            ->actif()
-            ->with(['coutLivraison' => fn ($q) => $q->where('statut', 'actif')])
-            ->whereHas('coutLivraison', fn ($q) => $q->where('statut', 'actif'))
-            ->orderBy('nom')
-            ->get(['id', 'nom']);
-
-        $cocktails = Cocktail::query()
-            ->where('statut', 'actif')
-            ->with(['lignes.produit'])
-            ->orderBy('nom')
-            ->get();
-
-        $cocktailsCatalog = $cocktails->map(fn (Cocktail $cocktail) => $cocktail->toCatalogArray())->values();
-
-        $allCommandes = $commandesEnGros
-            ->concat($commandesDetail)
-            ->concat($commandesCocktail)
+        $commande->load(['lignes.produit', 'lignes.flacon', 'commune', 'cocktail']);
+        $data = $this->donneesListeCommandes($request);
+        $data['allCommandes'] = $data['allCommandes']
+            ->prepend($commande)
             ->unique('id')
             ->values();
 
-        return view('commandes.index', compact(
-            'commandesEnGros',
-            'commandesDetail',
-            'commandesCocktail',
-            'allCommandes',
-            'produits',
-            'flacons',
-            'communes',
-            'cocktails',
-            'cocktailsCatalog'
-        ));
+        return view('commandes.index', $data + [
+            'editId' => $commande->id,
+            'openSection' => $this->sectionPourCommande($commande),
+            'openCreate' => false,
+        ]);
     }
 
     public function store(Request $request)
@@ -144,18 +109,17 @@ class CommandeController extends Controller
             });
         } catch (ValidationException $e) {
             return redirect()
-                ->route('commandes.index', ['create' => 1])
+                ->route('commandes.index')
+                ->with('open_create', true)
                 ->withInput()
                 ->withErrors($e->errors());
         }
 
-        return redirect()
-            ->route('commandes.index', [
-                'section' => in_array($validated['type'], [Commande::TYPE_COCKTAIL, Commande::TYPE_MIXTE], true)
-                    ? 'cocktail'
-                    : 'en_gros',
-            ])
-            ->with('success', 'Commande créée avec succès.');
+        return $this->redirectListe(
+            in_array($validated['type'], [Commande::TYPE_COCKTAIL, Commande::TYPE_MIXTE], true)
+                ? 'cocktail'
+                : 'en_gros'
+        )->with('success', 'Commande créée avec succès.');
     }
 
     public function update(Request $request, Commande $commande)
@@ -222,14 +186,12 @@ class CommandeController extends Controller
             });
         } catch (ValidationException $e) {
             return redirect()
-                ->route('commandes.index', ['edit' => $commande->id, 'section' => $section])
+                ->route('commandes.show', $commande)
                 ->withInput()
                 ->withErrors($e->errors());
         }
 
-        return redirect()
-            ->route('commandes.index', ['section' => $section])
-            ->with('success', 'Commande mise à jour.');
+        return $this->redirectListe($section)->with('success', 'Commande mise à jour.');
     }
 
     public function updateStatut(Request $request, Commande $commande)
@@ -243,7 +205,7 @@ class CommandeController extends Controller
         $section = $request->input('section', 'en_gros');
 
         if ($ancienStatut === $nouveauStatut) {
-            return redirect()->route('commandes.index', ['section' => $section]);
+            return $this->redirectListe($section);
         }
 
         try {
@@ -262,14 +224,10 @@ class CommandeController extends Controller
                 $commande->update(['statut' => $nouveauStatut]);
             });
         } catch (ValidationException $e) {
-            return redirect()
-                ->route('commandes.index', ['section' => $section])
-                ->withErrors($e->errors());
+            return $this->redirectListe($section)->withErrors($e->errors());
         }
 
-        return redirect()
-            ->route('commandes.index', ['section' => $section])
-            ->with('success', 'Statut de la commande mis à jour.');
+        return $this->redirectListe($section)->with('success', 'Statut de la commande mis à jour.');
     }
 
     public function envoyerOvl(Request $request, Commande $commande, OvlIntegrationService $ovl)
@@ -280,9 +238,7 @@ class CommandeController extends Controller
         try {
             $result = $ovl->envoyerCommande($commande);
         } catch (\Throwable $e) {
-            return redirect()
-                ->route('commandes.index', ['section' => $section])
-                ->with('error', $e->getMessage());
+            return $this->redirectListe($section)->with('error', $e->getMessage());
         }
 
         $message = $result['message'];
@@ -290,9 +246,7 @@ class CommandeController extends Controller
             $message .= ' (OVL #'.$result['id'].')';
         }
 
-        return redirect()
-            ->route('commandes.index', ['section' => $section])
-            ->with('success', $message);
+        return $this->redirectListe($section)->with('success', $message);
     }
 
     private function validateCommande(Request $request): array
@@ -601,12 +555,16 @@ class CommandeController extends Controller
      */
     private function redirectErreursLignes(array $erreurs, ?int $editId = null): \Illuminate\Http\RedirectResponse
     {
-        $params = $editId
-            ? ['edit' => $editId]
-            : ['create' => 1];
+        if ($editId) {
+            return redirect()
+                ->route('commandes.show', $editId)
+                ->withInput()
+                ->withErrors($erreurs);
+        }
 
         return redirect()
-            ->route('commandes.index', $params)
+            ->route('commandes.index')
+            ->with('open_create', true)
             ->withInput()
             ->withErrors($erreurs);
     }
@@ -683,6 +641,117 @@ class CommandeController extends Controller
                     : ' ('.$ligne->flacon->contenance_ml.' ml × '.$ligne->quantite.
                         ' — '.$ligne->categorieLabel().')'),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function donneesListeCommandes(Request $request): array
+    {
+        $baseQuery = Commande::query()
+            ->with(['lignes.produit', 'lignes.flacon', 'commune', 'cocktail'])
+            ->withCount('lignes')
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $q = '%'.$request->string('q').'%';
+                $query->where(function ($inner) use ($q) {
+                    $inner->where('reference', 'like', $q)
+                        ->orWhere('client_nom', 'like', $q)
+                        ->orWhere('client_telephone', 'like', $q)
+                        ->orWhereHas('commune', fn ($c) => $c->where('nom', 'like', $q))
+                        ->orWhereHas('cocktail', fn ($c) => $c->where('nom', 'like', $q))
+                        ->orWhereHas('lignes.produit', fn ($p) => $p->where('nom', 'like', $q));
+                });
+            })
+            ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
+            ->latest();
+
+        $commandesEnGros = (clone $baseQuery)
+            ->whereHas('lignes', fn ($q) => $q->where('categorie', PrixUnitaire::CATEGORIE_EN_GROS))
+            ->get();
+
+        $commandesDetail = (clone $baseQuery)
+            ->whereHas('lignes', fn ($q) => $q->where('categorie', PrixUnitaire::CATEGORIE_DETAIL))
+            ->get();
+
+        $commandesCocktail = (clone $baseQuery)
+            ->where(function ($query) {
+                $query->whereIn('type', [Commande::TYPE_COCKTAIL, Commande::TYPE_MIXTE])
+                    ->orWhereHas('lignes', fn ($l) => $l->whereNotNull('quantite_ml'));
+            })
+            ->get();
+
+        $produits = Produit::query()
+            ->where('statut', 'actif')
+            ->orderBy('nom')
+            ->get(['id', 'nom']);
+
+        $flacons = Flacon::query()
+            ->actif()
+            ->orderBy('contenance_ml')
+            ->get(['id', 'nom', 'contenance_ml']);
+
+        $communes = Commune::query()
+            ->actif()
+            ->with(['coutLivraison' => fn ($q) => $q->where('statut', 'actif')])
+            ->whereHas('coutLivraison', fn ($q) => $q->where('statut', 'actif'))
+            ->orderBy('nom')
+            ->get(['id', 'nom']);
+
+        $cocktails = Cocktail::query()
+            ->where('statut', 'actif')
+            ->with(['lignes.produit'])
+            ->orderBy('nom')
+            ->get();
+
+        return [
+            'commandesEnGros' => $commandesEnGros,
+            'commandesDetail' => $commandesDetail,
+            'commandesCocktail' => $commandesCocktail,
+            'allCommandes' => $commandesEnGros
+                ->concat($commandesDetail)
+                ->concat($commandesCocktail)
+                ->unique('id')
+                ->values(),
+            'produits' => $produits,
+            'flacons' => $flacons,
+            'communes' => $communes,
+            'cocktails' => $cocktails,
+            'cocktailsCatalog' => $cocktails->map(fn (Cocktail $cocktail) => $cocktail->toCatalogArray())->values(),
+        ];
+    }
+
+    private function sectionDepuisRequete(Request $request): string
+    {
+        $section = (string) session('section', $request->input('section', 'en_gros'));
+
+        return in_array($section, ['en_gros', 'detail', 'cocktail'], true) ? $section : 'en_gros';
+    }
+
+    private function sectionPourCommande(Commande $commande): string
+    {
+        $commande->loadMissing('lignes');
+
+        if ($commande->hasLignesCocktail()) {
+            return 'cocktail';
+        }
+
+        if ($commande->hasCategorie(PrixUnitaire::CATEGORIE_DETAIL)
+            && ! $commande->hasCategorie(PrixUnitaire::CATEGORIE_EN_GROS)) {
+            return 'detail';
+        }
+
+        return 'en_gros';
+    }
+
+    private function redirectListe(?string $section = null): \Illuminate\Http\RedirectResponse
+    {
+        $redirect = redirect()->route('commandes.index');
+
+        if (in_array($section, ['en_gros', 'detail', 'cocktail'], true)) {
+            $redirect->with('section', $section);
+        }
+
+        return $redirect;
     }
 
     private function generateReference(): string
