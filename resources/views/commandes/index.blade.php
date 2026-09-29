@@ -296,6 +296,7 @@
               'categorie' => $first->categorie === 'cocktail' ? 'detail' : $first->categorie,
               'flacon_id' => $first->flacon_id,
               'quantite' => $first->quantite,
+              'montant' => round((float) $lignes->sum('prix_unitaire'), 2),
               'cocktail_id' => $commande->cocktail_id,
               'parfums' => $lignes->map(fn ($l) => [
                 'produit_id' => $l->produit_id,
@@ -1125,6 +1126,14 @@
               if (recap && recap.dataset.over === '1') {
                 invalid = true;
                 alert('Le volume total des parfums doit être exactement égal à la contenance du flacon.');
+              }
+              var montantInput = groupe.querySelector('.cocktail-montant-input');
+              if (!montantInput || !(Number(montantInput.value) > 0)) {
+                invalid = true;
+                if (montantInput) montantInput.classList.add('is-invalid');
+                alert('Indiquez le montant du cocktail.');
+              } else if (montantInput) {
+                montantInput.classList.remove('is-invalid');
               }
             });
 

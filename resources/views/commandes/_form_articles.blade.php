@@ -142,14 +142,14 @@
             </div>
             <div class="form-text">Si le cocktail n’existe pas, choisissez « Créer ce cocktail » pour l’enregistrer.</div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label">Catégorie</label>
             <select name="groupes_cocktail[{{ $gIndex }}][categorie]" class="form-select">
               <option value="en_gros" @selected($categorieCocktail === 'en_gros')>En gros</option>
               <option value="detail" @selected($categorieCocktail === 'detail')>Détail</option>
             </select>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label">Contenance du flacon</label>
             <select name="groupes_cocktail[{{ $gIndex }}][flacon_id]" class="form-select cocktail-flacon-select">
               <option value="" data-ml="0">Sélectionner</option>
@@ -160,7 +160,7 @@
               @endforeach
             </select>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label">Nombre de flacons</label>
             <input
               type="number"
@@ -169,6 +169,18 @@
               min="1"
               step="1"
               value="{{ $groupe['quantite'] ?? 1 }}" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Montant (FCFA)</label>
+            <input
+              type="number"
+              name="groupes_cocktail[{{ $gIndex }}][montant]"
+              class="form-control cocktail-montant-input"
+              min="1"
+              step="1"
+              placeholder="Prix du cocktail"
+              value="{{ $groupe['montant'] ?? '' }}" />
+            <div class="form-text">Montant d’un flacon, saisi manuellement.</div>
           </div>
         </div>
 

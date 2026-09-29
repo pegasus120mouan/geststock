@@ -267,6 +267,7 @@ class CommandeController extends Controller
             'groupes_cocktail.*.categorie' => ['nullable', Rule::in(array_keys(PrixUnitaire::categories()))],
             'groupes_cocktail.*.flacon_id' => ['nullable', 'integer', Rule::exists('flacons', 'id')],
             'groupes_cocktail.*.quantite' => ['nullable', 'integer', 'min:1'],
+            'groupes_cocktail.*.montant' => ['nullable', 'numeric', 'gt:0'],
             'groupes_cocktail.*.cocktail_id' => ['nullable', 'integer', Rule::exists('cocktails', 'id')],
             'groupes_cocktail.*.parfums' => ['nullable', 'array'],
             'groupes_cocktail.*.parfums.*.produit_id' => ['nullable', 'integer', Rule::exists('produits', 'id')],
@@ -276,6 +277,7 @@ class CommandeController extends Controller
             'lignes.*.produit_id.required' => 'Sélectionnez un parfum.',
             'lignes.*.flacon_id.required' => 'Sélectionnez une contenance.',
             'groupes_cocktail.*.parfums.*.quantite_ml.gt' => 'La quantité d’un parfum doit être supérieure à 0 ml.',
+            'groupes_cocktail.*.montant.gt' => 'Le montant du cocktail doit être supérieur à 0.',
         ]);
     }
 
@@ -465,12 +467,17 @@ class CommandeController extends Controller
 
         $flacon = Flacon::query()->find($flaconId);
         $contenance = (int) ($flacon?->contenance_ml ?? 0);
-        $labelPrix = $categorie === PrixUnitaire::CATEGORIE_EN_GROS ? 'gros' : 'détail';
-        $erreurs = [];
+        $montantFlacon = round((float) ($groupe['montant'] ?? 0), 2);
 
         if ($contenance <= 0) {
             return $this->redirectErreursLignes([
                 "groupes_cocktail.$gIndex.flacon_id" => 'Contenance invalide pour ce cocktail.',
+            ], $editId);
+        }
+
+        if ($montantFlacon <= 0) {
+            return $this->redirectErreursLignes([
+                "groupes_cocktail.$gIndex.montant" => 'Indiquez le montant du cocktail (FCFA).',
             ], $editId);
         }
 
@@ -510,27 +517,18 @@ class CommandeController extends Controller
             ], $editId);
         }
 
-        $produits = Produit::query()
-            ->whereIn('id', array_keys($parParfum))
-            ->get()
-            ->keyBy('id');
-
+        $items = array_values($parParfum);
         $lignesPreparees = [];
+        $sommePrix = 0.0;
+        $dernier = count($items) - 1;
 
-        foreach ($parParfum as $item) {
-            $index = $item['index'];
-            $produit = $produits->get($item['produit_id']);
-            $parfum = $produit?->nom ?: 'inconnu';
-
-            $tarif = PrixUnitaire::trouver($item['produit_id'], $flaconId, $categorie);
-
-            if (! $tarif) {
-                $erreurs["groupes_cocktail.$gIndex.parfums.$index.produit_id"] = "Parfum : {$parfum}, contenance : {$contenance} ml, prix {$labelPrix} manquant.";
-                continue;
+        foreach ($items as $i => $item) {
+            if ($i === $dernier) {
+                $prixUnitaire = round($montantFlacon - $sommePrix, 2);
+            } else {
+                $prixUnitaire = round($montantFlacon * ($item['ml'] / $contenance), 2);
+                $sommePrix += $prixUnitaire;
             }
-
-            $part = $item['ml'] / $contenance;
-            $prixUnitaire = round((float) $tarif->prix * $part, 2);
 
             $lignesPreparees[] = [
                 'produit_id' => $item['produit_id'],
@@ -541,10 +539,6 @@ class CommandeController extends Controller
                 'prix_unitaire' => $prixUnitaire,
                 'total' => round($prixUnitaire * $nbFlacons, 2),
             ];
-        }
-
-        if ($erreurs !== []) {
-            return $this->redirectErreursLignes($erreurs, $editId);
         }
 
         return $lignesPreparees;
