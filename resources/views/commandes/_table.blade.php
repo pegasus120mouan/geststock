@@ -1,5 +1,5 @@
-<div class="table-responsive text-nowrap">
-  <table class="table mb-0">
+<div class="table-responsive">
+  <table class="table table-sm mb-0 commande-liste-table">
     <thead>
       <tr>
         <th>Date commande</th>
@@ -48,11 +48,11 @@
             @endforeach
           </td>
           <td>{{ $commande->commune?->nom ?? '—' }}</td>
-          <td class="fw-semibold text-primary">{{ $fmt($commande->montantArticles()) }} FCFA</td>
-          <td class="fw-semibold">{{ $fmt($commande->frais_livraison) }} FCFA</td>
+          <td class="fw-semibold text-primary text-nowrap">{{ $fmt($commande->montantArticles()) }} FCFA</td>
+          <td class="fw-semibold text-nowrap">{{ $fmt($commande->frais_livraison) }} FCFA</td>
           <td>{{ $commande->client_nom ?: '—' }}</td>
           <td>{{ $commande->client_telephone }}</td>
-          <td style="min-width: 160px;">
+          <td>
             <form method="POST" action="{{ route('commandes.statut', $commande) }}" class="m-0">
               @csrf
               @method('PATCH')
@@ -98,60 +98,54 @@
           </td>
         </tr>
         <tr class="collapse" id="lignesCommande{{ $section ?? 'all' }}_{{ $commande->id }}">
-          <td colspan="11" class="bg-label-secondary bg-opacity-10">
-            <div class="p-3">
-              <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                  <thead>
-                    <tr>
-                      <th>Parfum</th>
-                      <th>Contenance</th>
-                      <th>Catégorie</th>
-                      <th>Qté</th>
-                      <th>Volume</th>
-                      <th>Prix unitaire</th>
-                      <th>Montant</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @foreach ($commande->lignes as $ligne)
-                      <tr>
-                        <td>
-                          {{ $ligne->produit?->nom ?? '—' }}
-                          @if ($ligne->isCocktail())
-                            <div class="small text-muted">{{ rtrim(rtrim(number_format((float) $ligne->quantite_ml, 2, ',', ' '), '0'), ',') }} ml dans le mélange</div>
-                          @endif
-                        </td>
-                        <td>{{ $ligne->flacon ? $ligne->flacon->contenance_ml.' ml' : '—' }}</td>
-                        <td>
-                          <span class="badge {{ $ligne->isCocktail() ? 'bg-label-warning' : ($ligne->isEnGros() ? 'bg-label-info' : 'bg-label-primary') }}">
-                            {{ $ligne->categorieLabel() }}
-                          </span>
-                        </td>
-                        <td>{{ $ligne->quantite }}</td>
-                        <td>{{ rtrim(rtrim(number_format($ligne->volumeMl(), 2, ',', ' '), '0'), ',') }} ml</td>
-                        <td>{{ $fmt($ligne->prix_unitaire) }} FCFA</td>
-                        <td class="fw-semibold">{{ $fmt($ligne->montant()) }} FCFA</td>
-                      </tr>
-                    @endforeach
-                  </tbody>
-                </table>
-                <div class="d-flex justify-content-center mt-3">
-                  <div style="min-width: 280px">
-                    <div class="d-flex justify-content-between gap-4 mb-1">
-                      <span class="text-muted">Sous-total parfums</span>
-                      <span class="fw-semibold">{{ $fmt($commande->montantArticles()) }} FCFA</span>
-                    </div>
-                    <div class="d-flex justify-content-between gap-4 mb-1">
-                      <span class="text-muted">Coût livraison ({{ $commande->commune?->nom ?? '—' }})</span>
-                      <span class="fw-semibold">{{ $fmt($commande->frais_livraison) }} FCFA</span>
-                    </div>
-                    <div class="d-flex justify-content-between gap-4 pt-1 border-top">
-                      <span class="fw-semibold">Total</span>
-                      <span class="fw-bold text-primary">{{ $fmt($commande->montant()) }} FCFA</span>
-                    </div>
-                  </div>
-                </div>
+          <td colspan="11" class="bg-label-secondary bg-opacity-10 py-2">
+            <table class="table table-sm w-auto mb-2 commande-lignes-table">
+              <thead>
+                <tr>
+                  <th>Parfum</th>
+                  <th>Contenance</th>
+                  <th>Catégorie</th>
+                  <th>Qté</th>
+                  <th>Volume</th>
+                  <th>Prix unitaire</th>
+                  <th>Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach ($commande->lignes as $ligne)
+                  <tr>
+                    <td>
+                      {{ $ligne->produit?->nom ?? '—' }}
+                      @if ($ligne->isCocktail())
+                        <div class="small text-muted">{{ rtrim(rtrim(number_format((float) $ligne->quantite_ml, 2, ',', ' '), '0'), ',') }} ml dans le mélange</div>
+                      @endif
+                    </td>
+                    <td>{{ $ligne->flacon ? $ligne->flacon->contenance_ml.' ml' : '—' }}</td>
+                    <td>
+                      <span class="badge {{ $ligne->isCocktail() ? 'bg-label-warning' : ($ligne->isEnGros() ? 'bg-label-info' : 'bg-label-primary') }}">
+                        {{ $ligne->categorieLabel() }}
+                      </span>
+                    </td>
+                    <td>{{ $ligne->quantite }}</td>
+                    <td>{{ rtrim(rtrim(number_format($ligne->volumeMl(), 2, ',', ' '), '0'), ',') }} ml</td>
+                    <td class="text-nowrap">{{ $fmt($ligne->prix_unitaire) }} FCFA</td>
+                    <td class="fw-semibold text-nowrap">{{ $fmt($ligne->montant()) }} FCFA</td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+            <div class="commande-lignes-totaux">
+              <div class="d-flex justify-content-between gap-3 mb-1">
+                <span class="text-muted">Sous-total parfums</span>
+                <span class="fw-semibold">{{ $fmt($commande->montantArticles()) }} FCFA</span>
+              </div>
+              <div class="d-flex justify-content-between gap-3 mb-1">
+                <span class="text-muted">Coût livraison ({{ $commande->commune?->nom ?? '—' }})</span>
+                <span class="fw-semibold">{{ $fmt($commande->frais_livraison) }} FCFA</span>
+              </div>
+              <div class="d-flex justify-content-between gap-3 pt-1 border-top">
+                <span class="fw-semibold">Total</span>
+                <span class="fw-bold text-primary">{{ $fmt($commande->montant()) }} FCFA</span>
               </div>
             </div>
           </td>
@@ -166,3 +160,17 @@
     </tbody>
   </table>
 </div>
+@once
+<style>
+  .commande-liste-table > :not(caption) > * > * {
+    padding: .45rem .6rem;
+  }
+  .commande-lignes-table > :not(caption) > * > * {
+    padding: .3rem .55rem;
+    white-space: nowrap;
+  }
+  .commande-lignes-totaux {
+    max-width: 260px;
+  }
+</style>
+@endonce
