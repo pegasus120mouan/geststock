@@ -51,7 +51,7 @@ class CommandeController extends Controller
             return redirect()->route('commandes.index');
         }
 
-        $commande->load(['lignes.produit', 'lignes.flacon', 'commune', 'cocktail']);
+        $commande->load(['lignes.produit', 'lignes.flacon', 'lignes.cocktail', 'commune', 'cocktail']);
         $data = $this->donneesListeCommandes($request);
         $data['allCommandes'] = $data['allCommandes']
             ->prepend($commande)
@@ -317,6 +317,7 @@ class CommandeController extends Controller
             $preparees = array_merge($preparees, $result);
         }
 
+        $groupeIndex = 0;
         foreach ($validated['groupes_cocktail'] ?? [] as $gIndex => $groupe) {
             $parfums = collect($groupe['parfums'] ?? [])
                 ->filter(fn ($parfum) => filled($parfum['produit_id'] ?? null) && (float) ($parfum['quantite_ml'] ?? 0) > 0)
@@ -335,11 +336,12 @@ class CommandeController extends Controller
                 continue;
             }
 
-            $result = $this->preparerUnGroupeCocktail($groupe, $parfums, (int) $gIndex, $editId);
+            $result = $this->preparerUnGroupeCocktail($groupe, $parfums, (int) $gIndex, $editId, $groupeIndex);
             if ($result instanceof \Illuminate\Http\RedirectResponse) {
                 return $result;
             }
             $preparees = array_merge($preparees, $result);
+            $groupeIndex++;
         }
 
         if ($preparees === []) {
@@ -453,7 +455,7 @@ class CommandeController extends Controller
      * @param  array<int, array<string, mixed>>  $parfums
      * @return array<int, array<string, mixed>>|\Illuminate\Http\RedirectResponse
      */
-    private function preparerUnGroupeCocktail(array $groupe, array $parfums, int $gIndex, ?int $editId = null)
+    private function preparerUnGroupeCocktail(array $groupe, array $parfums, int $gIndex, ?int $editId = null, int $groupeIndex = 0)
     {
         $flaconId = (int) ($groupe['flacon_id'] ?? 0);
         $categorie = $groupe['categorie'] ?? '';
@@ -533,6 +535,8 @@ class CommandeController extends Controller
             $lignesPreparees[] = [
                 'produit_id' => $item['produit_id'],
                 'flacon_id' => $flaconId,
+                'cocktail_id' => filled($groupe['cocktail_id'] ?? null) ? (int) $groupe['cocktail_id'] : null,
+                'cocktail_groupe' => $groupeIndex,
                 'categorie' => $categorie,
                 'quantite' => $nbFlacons,
                 'quantite_ml' => $item['ml'],
@@ -643,7 +647,7 @@ class CommandeController extends Controller
     private function donneesListeCommandes(Request $request): array
     {
         $baseQuery = Commande::query()
-            ->with(['lignes.produit', 'lignes.flacon', 'commune', 'cocktail'])
+            ->with(['lignes.produit', 'lignes.flacon', 'lignes.cocktail', 'commune', 'cocktail'])
             ->withCount('lignes')
             ->when($request->filled('q'), function ($query) use ($request) {
                 $q = '%'.$request->string('q').'%';
@@ -653,6 +657,7 @@ class CommandeController extends Controller
                         ->orWhere('client_telephone', 'like', $q)
                         ->orWhereHas('commune', fn ($c) => $c->where('nom', 'like', $q))
                         ->orWhereHas('cocktail', fn ($c) => $c->where('nom', 'like', $q))
+                        ->orWhereHas('lignes.cocktail', fn ($c) => $c->where('nom', 'like', $q))
                         ->orWhereHas('lignes.produit', fn ($p) => $p->where('nom', 'like', $q));
                 });
             })
@@ -691,11 +696,11 @@ class CommandeController extends Controller
             ->orderBy('nom')
             ->get(['id', 'nom']);
 
-        $cocktails = Cocktail::query()
-            ->where('statut', 'actif')
+        $tousCocktails = Cocktail::query()
             ->with(['lignes.produit'])
             ->orderBy('nom')
             ->get();
+        $cocktails = $tousCocktails->where('statut', 'actif')->values();
 
         return [
             'commandesEnGros' => $commandesEnGros,
@@ -710,6 +715,7 @@ class CommandeController extends Controller
             'flacons' => $flacons,
             'communes' => $communes,
             'cocktails' => $cocktails,
+            'tousCocktails' => $tousCocktails,
             'cocktailsCatalog' => $cocktails->map(fn (Cocktail $cocktail) => $cocktail->toCatalogArray())->values(),
         ];
     }

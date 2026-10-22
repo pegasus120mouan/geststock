@@ -287,25 +287,7 @@
       @php
         $isThisEdit = (string) $editId === (string) $commande->id;
         $lignesNormalesCommande = $commande->lignes->filter(fn ($l) => $l->quantite_ml === null);
-        $groupesDepuisCommande = $commande->lignes
-          ->filter(fn ($l) => $l->quantite_ml !== null)
-          ->groupBy(fn ($l) => $l->flacon_id.'|'.$l->categorie.'|'.$l->quantite)
-          ->map(function ($lignes) use ($commande) {
-            $first = $lignes->first();
-            return [
-              'categorie' => $first->categorie === 'cocktail' ? 'detail' : $first->categorie,
-              'flacon_id' => $first->flacon_id,
-              'quantite' => $first->quantite,
-              'montant' => round((float) $lignes->sum('prix_unitaire'), 2),
-              'cocktail_id' => $commande->cocktail_id,
-              'parfums' => $lignes->map(fn ($l) => [
-                'produit_id' => $l->produit_id,
-                'quantite_ml' => $l->quantite_ml,
-              ])->values()->all(),
-            ];
-          })
-          ->values()
-          ->all();
+        $groupesDepuisCommande = $commande->groupesCocktailPourFormulaire($tousCocktails ?? $cocktails);
         $editLignesNormales = $isThisEdit && is_array(old('lignes'))
           ? old('lignes')
           : ($lignesNormalesCommande->isNotEmpty()
@@ -1015,6 +997,14 @@
           return max + 1;
         }
 
+        function refreshGroupeCocktailTitles(container) {
+          if (!container) return;
+          container.querySelectorAll('.groupe-cocktail').forEach(function (groupe, index) {
+            var title = groupe.querySelector('.groupe-cocktail-title');
+            if (title) title.textContent = 'Cocktail ' + (index + 1);
+          });
+        }
+
         function reindexGroupeCocktail(groupe, gIndex) {
           groupe.setAttribute('data-index', String(gIndex));
           groupe.querySelectorAll('[name]').forEach(function (el) {
@@ -1251,6 +1241,7 @@
             reindexGroupeCocktail(clone, nextGroupeIndex(container));
             container.appendChild(clone);
             resetGroupeCocktail(clone);
+            refreshGroupeCocktailTitles(container);
             bindCocktailAutocomplete(clone);
             return;
           }
@@ -1274,6 +1265,7 @@
               return;
             }
             groupeRm.remove();
+            refreshGroupeCocktailTitles(containerRm);
             return;
           }
 

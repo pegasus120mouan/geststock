@@ -18,6 +18,8 @@ class CommandeLigne extends Model
         'commande_id',
         'produit_id',
         'flacon_id',
+        'cocktail_id',
+        'cocktail_groupe',
         'categorie',
         'quantite',
         'quantite_ml',
@@ -29,6 +31,7 @@ class CommandeLigne extends Model
     {
         return [
             'quantite' => 'integer',
+            'cocktail_groupe' => 'integer',
             'quantite_ml' => 'decimal:2',
             'prix_unitaire' => 'decimal:2',
             'total' => 'decimal:2',
@@ -48,6 +51,11 @@ class CommandeLigne extends Model
     public function flacon(): BelongsTo
     {
         return $this->belongsTo(Flacon::class);
+    }
+
+    public function cocktail(): BelongsTo
+    {
+        return $this->belongsTo(Cocktail::class);
     }
 
     public function isEnGros(): bool

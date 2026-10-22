@@ -117,6 +117,9 @@
                     <td>
                       {{ $ligne->produit?->nom ?? '—' }}
                       @if ($ligne->isCocktail())
+                        @if ($ligne->cocktail?->nom)
+                          <div class="small fw-medium">{{ $ligne->cocktail->nom }}</div>
+                        @endif
                         <div class="small text-muted">{{ rtrim(rtrim(number_format((float) $ligne->quantite_ml, 2, ',', ' '), '0'), ',') }} ml dans le mélange</div>
                       @endif
                     </td>

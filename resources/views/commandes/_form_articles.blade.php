@@ -122,7 +122,8 @@
     @endphp
     <div class="card border mb-3 groupe-cocktail {{ filled($groupe['cocktail_id'] ?? null) ? 'cocktail-locked' : '' }}" data-index="{{ $gIndex }}">
       <div class="card-body">
-        <div class="d-flex justify-content-end mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0 groupe-cocktail-title">Cocktail {{ $loop->iteration }}</h6>
           <button type="button" class="btn btn-sm btn-outline-danger btn-remove-groupe-cocktail" title="Retirer ce cocktail">
             <i class="bx bx-trash"></i>
           </button>
