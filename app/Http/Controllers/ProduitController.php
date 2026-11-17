@@ -22,6 +22,10 @@ class ProduitController extends Controller
             $query->where('statut', $request->string('statut'));
         }
 
+        if ($request->boolean('alerte')) {
+            $query->sousSeuilAlerte()->reorder()->orderBy('stock_ml')->orderBy('nom');
+        }
+
         return view('produits.index', [
             'produits' => $query->paginate(15)->withQueryString(),
         ]);

@@ -213,7 +213,7 @@
                     </span>
                     <h5 class="mb-0">Stock faible</h5>
                   </div>
-                  <span class="badge bg-warning rounded-pill">Seuil d’alerte atteint</span>
+                  <span class="badge bg-warning rounded-pill">≤ {{ $fmt($seuilFaible ?? 100) }} ml</span>
                 </div>
 
                 <div class="d-flex align-items-end justify-content-between">
@@ -227,7 +227,7 @@
                     <span class="avatar bg-label-warning rounded">
                       <i class="bx bx-error"></i>
                     </span>
-                    <a href="{{ route('produits.index') }}" class="btn btn-sm btn-outline-warning">
+                    <a href="{{ route('produits.index', ['alerte' => 1]) }}" class="btn btn-sm btn-outline-warning">
                       <i class="bx bx-show me-1"></i> Voir
                     </a>
                   </div>
@@ -239,7 +239,7 @@
                       <li class="d-flex justify-content-between align-items-center py-1">
                         <span class="text-truncate me-2">{{ $produit->nom }}</span>
                         <span class="badge bg-label-warning">
-                          {{ $fmt($produit->stock_ml) }} / {{ $fmt($produit->seuil_alerte_ml) }} ml
+                          {{ $fmt($produit->stock_ml) }} / {{ $fmt($produit->seuilAlerteEffectif()) }} ml
                         </span>
                       </li>
                     @endforeach

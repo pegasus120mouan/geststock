@@ -11,6 +11,8 @@ class Produit extends Model
 {
     use HasFactory;
 
+    public const SEUIL_ALERTE_DEFAUT_ML = 100;
+
     protected $fillable = [
         'nom',
         'marque',
@@ -85,22 +87,29 @@ class Produit extends Model
         return $this->seuil_alerte_ml !== null && (float) $this->seuil_alerte_ml > 0;
     }
 
+    public function seuilAlerteEffectif(): float
+    {
+        return $this->hasSeuilAlerte()
+            ? (float) $this->seuil_alerte_ml
+            : (float) self::SEUIL_ALERTE_DEFAUT_ML;
+    }
+
     public function isSousSeuilAlerte(): bool
     {
-        if (! $this->hasSeuilAlerte()) {
+        if (! $this->isActif()) {
             return false;
         }
 
-        return (float) $this->stock_ml <= (float) $this->seuil_alerte_ml;
+        return (float) $this->stock_ml <= $this->seuilAlerteEffectif();
     }
 
     public function scopeSousSeuilAlerte($query)
     {
+        $defaut = self::SEUIL_ALERTE_DEFAUT_ML;
+
         return $query
             ->where('statut', 'actif')
-            ->whereNotNull('seuil_alerte_ml')
-            ->where('seuil_alerte_ml', '>', 0)
-            ->whereColumn('stock_ml', '<=', 'seuil_alerte_ml');
+            ->whereRaw('stock_ml <= COALESCE(NULLIF(seuil_alerte_ml, 0), ?)', [$defaut]);
     }
 
     public function getImageUrlAttribute(): string

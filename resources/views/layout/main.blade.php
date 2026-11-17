@@ -443,15 +443,50 @@
             </div>
             <ul class="navbar-nav flex-row align-items-center ms-auto">
               @php
-                $nbAlertesNav = \App\Models\Produit::query()->sousSeuilAlerte()->count();
+                $alertesNavQuery = \App\Models\Produit::query()->sousSeuilAlerte()->orderBy('stock_ml')->orderBy('nom');
+                $nbAlertesNav = (clone $alertesNavQuery)->count();
+                $alertesNav = $alertesNavQuery->limit(8)->get(['id', 'nom', 'stock_ml', 'seuil_alerte_ml']);
               @endphp
-              <li class="nav-item me-3">
-                <a href="{{ route('produits.index') }}" class="btn btn-sm btn-outline-secondary position-relative" title="Parfums sous seuil d’alerte">
+              <li class="nav-item dropdown me-3">
+                <a
+                  href="javascript:void(0);"
+                  class="btn btn-sm {{ $nbAlertesNav > 0 ? 'btn-outline-danger' : 'btn-outline-secondary' }} position-relative dropdown-toggle hide-arrow"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  title="Parfums à 100 ml ou moins">
                   Alertes stock
-                  <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                  <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill {{ $nbAlertesNav > 0 ? 'bg-danger' : 'bg-secondary' }}">
                     {{ $nbAlertesNav }}
                   </span>
                 </a>
+                <ul class="dropdown-menu dropdown-menu-end py-0" style="min-width: 320px; max-width: 360px;">
+                  <li class="dropdown-header d-flex justify-content-between align-items-center py-3">
+                    <span class="fw-semibold">Alertes stock</span>
+                    <small class="text-muted">≤ 100 ml</small>
+                  </li>
+                  <li><hr class="dropdown-divider my-0"></li>
+                  @forelse ($alertesNav as $alerte)
+                    <li>
+                      <a class="dropdown-item py-2" href="{{ route('produits.show', $alerte) }}">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                          <span class="text-truncate">{{ $alerte->nom }}</span>
+                          <span class="badge bg-label-danger flex-shrink-0">{{ number_format((float) $alerte->stock_ml, 0, ',', ' ') }} ml</span>
+                        </div>
+                      </a>
+                    </li>
+                  @empty
+                    <li class="px-3 py-3 text-muted small">Aucun parfum à 100 ml ou moins.</li>
+                  @endforelse
+                  @if ($nbAlertesNav > $alertesNav->count())
+                    <li class="px-3 py-2 small text-muted">+ {{ $nbAlertesNav - $alertesNav->count() }} autre{{ $nbAlertesNav - $alertesNav->count() > 1 ? 's' : '' }}</li>
+                  @endif
+                  <li><hr class="dropdown-divider my-0"></li>
+                  <li>
+                    <a class="dropdown-item text-center py-2" href="{{ route('produits.index', ['alerte' => 1]) }}">
+                      Voir toutes les alertes
+                    </a>
+                  </li>
+                </ul>
               </li>
               <li class="nav-item navbar-dropdown dropdown-user dropdown">
                 <a class="nav-link dropdown-toggle hide-arrow p-0" href="javascript:void(0);" data-bs-toggle="dropdown">

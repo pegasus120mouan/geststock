@@ -229,8 +229,9 @@
           aria-labelledby="tab-seuil">
           <div class="card-body">
             <p class="text-muted mb-4">
-              Définissez le volume minimum (ml). Quand le stock restant atteint ou descend sous ce seuil,
-              une alerte d’approvisionnement s’affiche pour ce parfum.
+              Par défaut, une alerte s’affiche dans <strong>Alertes stock</strong> dès qu’il reste
+              <strong>{{ number_format(\App\Models\Produit::SEUIL_ALERTE_DEFAUT_ML, 0, ',', ' ') }} ml</strong> ou moins.
+              Vous pouvez définir un seuil différent pour ce parfum.
             </p>
 
             @if ($produit->isSousSeuilAlerte())
@@ -240,17 +241,17 @@
                   Alerte active : stock actuel
                   <strong>{{ number_format((float) $produit->stock_ml, 2, ',', ' ') }} ml</strong>
                   ≤ seuil de
-                  <strong>{{ number_format((float) $produit->seuil_alerte_ml, 0, ',', ' ') }} ml</strong>.
+                  <strong>{{ number_format($produit->seuilAlerteEffectif(), 0, ',', ' ') }} ml</strong>.
                   Un réapprovisionnement est nécessaire.
                 </div>
               </div>
-            @elseif ($produit->hasSeuilAlerte())
+            @else
               <div class="alert alert-success d-flex align-items-center" role="alert">
                 <i class="bx bx-check-circle me-2 fs-4"></i>
                 <div>
                   Stock au-dessus du seuil
                   ({{ number_format((float) $produit->stock_ml, 2, ',', ' ') }} ml /
-                  seuil {{ number_format((float) $produit->seuil_alerte_ml, 0, ',', ' ') }} ml).
+                  seuil {{ number_format($produit->seuilAlerteEffectif(), 0, ',', ' ') }} ml).
                 </div>
               </div>
             @endif
@@ -265,7 +266,7 @@
                   inputmode="numeric"
                   class="form-control prix-fr-display @error('seuil_alerte_ml') is-invalid @enderror"
                   data-target="seuil_alerte_ml"
-                  placeholder="Ex: 250"
+                  placeholder="Ex: 100"
                   value="{{ old('seuil_alerte_ml', $produit->seuil_alerte_ml) !== null && old('seuil_alerte_ml', $produit->seuil_alerte_ml) !== '' ? number_format((float) old('seuil_alerte_ml', $produit->seuil_alerte_ml), 0, ',', ' ') : '' }}"
                   autocomplete="off" />
                 <input
@@ -274,7 +275,7 @@
                   id="seuil_alerte_ml"
                   value="{{ old('seuil_alerte_ml', $produit->seuil_alerte_ml) }}" />
                 @error('seuil_alerte_ml')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                <div class="form-text">Laissez vide pour désactiver l’alerte sur ce parfum.</div>
+                <div class="form-text">Laissez vide pour garder le seuil par défaut de {{ number_format(\App\Models\Produit::SEUIL_ALERTE_DEFAUT_ML, 0, ',', ' ') }} ml.</div>
               </div>
               <div class="col-12">
                 <button type="submit" class="btn btn-primary">

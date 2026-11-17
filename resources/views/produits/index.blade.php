@@ -7,8 +7,10 @@
   <div class="container-xxl flex-grow-1 container-p-y">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div>
-        <h4 class="mb-1">Parfums</h4>
-        <p class="mb-0 text-muted">Liste des parfums</p>
+        <h4 class="mb-1">{{ request()->boolean('alerte') ? 'Alertes stock' : 'Parfums' }}</h4>
+        <p class="mb-0 text-muted">
+          {{ request()->boolean('alerte') ? 'Parfums actifs dont il reste 100 ml ou moins' : 'Liste des parfums' }}
+        </p>
       </div>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNouveauProduit">
         <i class="bx bx-plus me-1"></i>Ajouter un parfum
@@ -19,6 +21,16 @@
       <div class="alert alert-success alert-dismissible fade show">
         {{ session('success') }}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    @endif
+
+    @if (request()->boolean('alerte'))
+      <div class="alert alert-warning d-flex justify-content-between align-items-center">
+        <div>
+          <i class="bx bx-error-circle me-1"></i>
+          Parfums dont il reste <strong>100 ml</strong> ou moins.
+        </div>
+        <a href="{{ route('produits.index') }}" class="btn btn-sm btn-outline-secondary">Tous les parfums</a>
       </div>
     @endif
 
@@ -38,6 +50,9 @@
             </select>
           </div>
           <div class="col-md-3">
+            @if (request()->boolean('alerte'))
+              <input type="hidden" name="alerte" value="1" />
+            @endif
             <button class="btn btn-outline-primary w-100" type="submit">Filtrer</button>
           </div>
         </div>
@@ -69,7 +84,12 @@
                     {{ $produit->nom }}
                   </a>
                 </td>
-                <td>{{ number_format((float) $produit->stock_ml, 2, ',', ' ') }}</td>
+                <td>
+                  {{ number_format((float) $produit->stock_ml, 2, ',', ' ') }}
+                  @if ($produit->isSousSeuilAlerte())
+                    <span class="badge bg-label-danger ms-1">≤ {{ number_format($produit->seuilAlerteEffectif(), 0, ',', ' ') }} ml</span>
+                  @endif
+                </td>
                 <td>
                   <span class="badge {{ $produit->isActif() ? 'bg-label-success' : 'bg-label-secondary' }}">
                     {{ ucfirst($produit->statut) }}
